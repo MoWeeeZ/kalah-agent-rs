@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::Board;
 
 use crate::agent::Agent;
@@ -5,14 +7,15 @@ use crate::minimax::minimax_search;
 
 pub struct MinimaxAgent {
     board: Board,
-    max_depth: u64,
+    thinking_dur: Duration,
 }
 
 impl MinimaxAgent {
-    pub fn new(h: u8, s: u16, max_depth: u64) -> Self {
+    #[allow(dead_code)]
+    pub fn new(h: u8, s: u16, thinking_dur: Duration) -> Self {
         MinimaxAgent {
             board: Board::new(h, s),
-            max_depth,
+            thinking_dur,
         }
     }
 }
@@ -23,6 +26,6 @@ impl Agent for MinimaxAgent {
     }
 
     fn get_move(&mut self) -> crate::Move {
-        minimax_search(&self.board, self.max_depth)
+        minimax_search(&self.board, self.thinking_dur)
     }
 }

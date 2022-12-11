@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use agent::{Agent, MinimaxAgent, RandomAgent};
 use board::Player;
 use rand::seq::SliceRandom;
@@ -16,11 +18,7 @@ fn single_ply(
     playing_agent: &mut impl Agent,
     opponent_agent: &mut impl Agent,
     player: Player,
-) -> Option<Player> {
-    if !board.has_legal_move(player) {
-        return None;
-    }
-
+) -> Player {
     println!("{}\n", board);
 
     let start_time = std::time::Instant::now();
@@ -60,9 +58,9 @@ fn single_ply(
     };
 
     if moves_again {
-        Some(player)
+        player
     } else {
-        Some(!player)
+        !player
     }
 }
 
@@ -73,13 +71,16 @@ fn game_loop(board: Board, white_agent: impl Agent, black_agent: impl Agent) {
 
     use Player::{Black, White};
 
-    let mut current_player = Some(White);
+    let mut current_player = White;
 
     loop {
         current_player = match current_player {
-            Some(White) => single_ply(&mut board, &mut white_agent, &mut black_agent, White),
-            Some(Black) => single_ply(&mut board, &mut black_agent, &mut white_agent, Black),
-            None => break,
+            White => single_ply(&mut board, &mut white_agent, &mut black_agent, White),
+            Black => single_ply(&mut board, &mut black_agent, &mut white_agent, Black),
+        };
+
+        if !board.has_legal_move() {
+            break;
         }
     }
 
@@ -98,9 +99,13 @@ fn main() {
     let h = 6;
     let s = 4;
 
+    let thinking_duration = Duration::from_secs(1);
+
     let board = Board::new(h, s);
-    // let white_agent = MinimaxAgent::new(h, s, 8);
-    let white_agent = MinimaxAgent::new(h, s, 10);
+
+    let white_agent = MinimaxAgent::new(h, s, thinking_duration);
+    // let white_agent = MctsAgent::new(h, s, 2);
+
     let black_agent = RandomAgent::new(h, s);
 
     game_loop(board, white_agent, black_agent);

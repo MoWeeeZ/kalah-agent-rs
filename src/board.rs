@@ -234,13 +234,8 @@ impl Board {
             .collect()
     }
 
-    pub fn has_legal_move(&self, player: Player) -> bool {
-        let houses = match player {
-            Player::White => self.our_houses(),
-            Player::Black => self.their_houses(),
-        };
-
-        houses.iter().any(|&house| house != 0)
+    pub fn has_legal_move(&self) -> bool {
+        self.our_houses().iter().any(|&house| house != 0) && self.their_houses().iter().any(|&house| house != 0)
     }
 
     pub fn finish_game(&mut self) {

@@ -9,6 +9,7 @@ pub struct RandomAgent {
 }
 
 impl RandomAgent {
+    #[allow(dead_code)]
     pub fn new(h: u8, s: u16) -> Self {
         RandomAgent {
             board: Board::new(h, s),
