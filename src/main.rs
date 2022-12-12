@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use agent::{Agent, MinimaxAgent};
+use agent::Agent;
 use board::Player;
 
 mod agent;
@@ -64,13 +64,13 @@ fn single_ply(
 }
 
 fn game_loop(board: Board, white_agent: impl Agent, black_agent: impl Agent) {
-    let mut board = board;
-    let mut white_agent = white_agent;
-    let mut black_agent = black_agent;
-
     use Player::{Black, White};
 
     let mut current_player = White;
+
+    let mut board = board;
+    let mut white_agent = white_agent;
+    let mut black_agent = black_agent;
 
     loop {
         current_player = match current_player {
@@ -102,11 +102,11 @@ fn main() {
 
     let board = Board::new(h, s);
 
-    let white_agent = MinimaxAgent::new(h, s, thinking_duration, true);
-    // let white_agent = MctsAgent::new(h, s, 2);
+    let white_agent = agent::MinimaxAgent::new(h, s, thinking_duration, true);
+    // let white_agent = agent::MctsAgent::new(h, s, 2);
 
-    // let black_agent = RandomAgent::new(h, s);
-    let black_agent = MinimaxAgent::new(h, s, thinking_duration, false);
+    // let black_agent = agent::RandomAgent::new(h, s);
+    let black_agent = agent::MinimaxAgent::new(h, s, thinking_duration, false);
 
     game_loop(board, white_agent, black_agent);
 }
