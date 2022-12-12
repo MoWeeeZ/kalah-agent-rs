@@ -1,9 +1,7 @@
 use std::time::Duration;
 
-use agent::{Agent, MinimaxAgent, RandomAgent};
+use agent::{Agent, MinimaxAgent};
 use board::Player;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
 
 mod agent;
 mod board;
@@ -38,8 +36,9 @@ fn single_ply(
     let valid_moves = board.legal_moves(player);
 
     if !valid_moves.iter().any(|valid_move| *valid_move == player_move) {
-        player_move = *valid_moves.choose(&mut thread_rng()).unwrap();
-        println!("Invalid move, using {} instead", player_move);
+        panic!("Invalid move");
+        /* player_move = *valid_moves.choose(&mut thread_rng()).unwrap();
+        println!("Invalid move, using {} instead", player_move); */
     }
 
     println!();
@@ -103,10 +102,11 @@ fn main() {
 
     let board = Board::new(h, s);
 
-    let white_agent = MinimaxAgent::new(h, s, thinking_duration);
+    let white_agent = MinimaxAgent::new(h, s, thinking_duration, true);
     // let white_agent = MctsAgent::new(h, s, 2);
 
-    let black_agent = RandomAgent::new(h, s);
+    // let black_agent = RandomAgent::new(h, s);
+    let black_agent = MinimaxAgent::new(h, s, thinking_duration, false);
 
     game_loop(board, white_agent, black_agent);
 }

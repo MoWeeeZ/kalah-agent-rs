@@ -6,123 +6,9 @@ use rand::{thread_rng, Rng};
 
 use crate::{Board, Move, Player};
 
-fn value_heuristic(board: &Board) -> f32 {
-    board.our_store as f32 - board.their_store as f32
-}
-
-/* fn count_nodes(node: &Node) -> u64 {
-    if node.has_children() {
-        node.child_iter().map(count_nodes).sum()
-    } else {
-        1
-    }
-}
-
-fn reset_and_extend_tree(node: &mut Node) {
-    node.value = f32::NEG_INFINITY;
-
-    if !node.has_children() {
-        // leaf node
-
-        let board = node.board().clone();
-        let valid_moves = board.legal_moves(Player::White);
-        let depth = node.depth();
-
-        for valid_move in valid_moves {
-            let mut next_board = board.clone();
-            let flip = !next_board.apply_move(valid_move);
-
-            if flip {
-                next_board.flip_board();
-            }
-
-            let next_node = Box::new(Node::new(next_board, valid_move, depth + 1));
-            node.append_child(next_node);
-        }
-    } else {
-        // inner node
-        for child_node in node.child_iter_mut() {
-            reset_and_extend_tree(child_node);
-        }
-    }
-}
-
-fn minimax_tree_value(node: &mut Node) {
-    if !node.has_children() {
-        node.value = value_heuristic(node.board());
-
-        return;
-    }
-
-    let flipped = node.board().flipped();
-
-    let mut value = node.value;
-
-    for child_node in node.child_iter_mut() {
-        minimax_tree_value(child_node);
-
-        let child_value = if flipped == child_node.board().flipped() {
-            child_node.value
-        } else {
-            -child_node.value
-        };
-
-        if child_value > value {
-            value = child_value;
-        }
-    }
-
-    node.value = value;
-}
-
-pub fn minimax_search(board: &Board, max_depth: u64) -> Move {
-    assert!(
-        board.has_legal_move(Player::White),
-        "Called minimax_search on board with no legal moves"
-    );
-    let start_time = std::time::Instant::now();
-
-    let mut best_move = Move::new(127, Player::White);
-
-    let mut root_node = Node::new(board.clone(), Move::new(127, Player::White), 0);
-
-    for _depth in 0..max_depth {
-        reset_and_extend_tree(&mut root_node);
-    }
-
-    minimax_tree_value(&mut root_node);
-
-    let mut best_value = f32::NEG_INFINITY;
-
-    for child_node in root_node.child_iter() {
-        let value = match child_node.colour() {
-            Player::White => child_node.value,
-            Player::Black => -child_node.value,
-        };
-
-        if value > best_value || (value == best_value && thread_rng().next_u64() % 2 == 0) {
-            best_value = value;
-            best_move = child_node.pre_move();
-        }
-    }
-
-    let end_time = std::time::Instant::now();
-
-    let dur = end_time - start_time;
-
-    let node_count = count_nodes(&root_node);
-
-    println!("Ran minimax to depth {}", max_depth);
-    println!("Total nodes considered: {}", node_count);
-    println!("NPS: {:.2e}", node_count as f64 / dur.as_secs_f64());
-    println!("Best move have value {}\n", best_value);
-
-    best_move
-} */
-
-fn minimax(board: &Board, remaining_depth: u32, alpha: f32, beta: f32) -> f32 {
+fn minimax(board: &Board, remaining_depth: u32, alpha: f32, beta: f32, alpha_beta_prune: bool) -> f32 {
     if remaining_depth == 0 {
-        return value_heuristic(board);
+        return board.value_heuristic();
     }
 
     let legal_moves = board.legal_moves(Player::White);
@@ -134,7 +20,7 @@ fn minimax(board: &Board, remaining_depth: u32, alpha: f32, beta: f32) -> f32 {
         let mut board = board.clone();
         board.finish_game();
 
-        let value = match value_heuristic(&board) {
+        let value = match board.value_heuristic() {
             val if val > 0.0 => f32::INFINITY,
             val if val < 0.0 => f32::NEG_INFINITY,
             val if val == 0.0 => 0.0,
@@ -162,7 +48,13 @@ fn minimax(board: &Board, remaining_depth: u32, alpha: f32, beta: f32) -> f32 {
                 false => (alpha, beta),
             };
 
-            let their_value = minimax(&next_board, remaining_depth - 1, their_alpha, their_beta);
+            let their_value = minimax(
+                &next_board,
+                remaining_depth - 1,
+                their_alpha,
+                their_beta,
+                alpha_beta_prune,
+            );
 
             match their_next_move {
                 true => -their_value,
@@ -174,27 +66,34 @@ fn minimax(board: &Board, remaining_depth: u32, alpha: f32, beta: f32) -> f32 {
             best_value = value;
         }
 
-        if value >= alpha {
-            alpha = value;
-        }
+        if alpha_beta_prune {
+            if value >= alpha {
+                alpha = value;
+            }
 
-        if value >= beta {
-            // beta cutoff, return early
-            return best_value;
+            if value >= beta {
+                // beta cutoff, return early
+                return best_value;
+            }
         }
     }
 
     best_value
 }
 
-fn minimax_worker(board: Board, current_best_move: Arc<Mutex<Move>>, search_active: Arc<AtomicBool>) {
+fn minimax_worker(
+    board: Board,
+    current_best_move: Arc<Mutex<Move>>,
+    search_active: Arc<AtomicBool>,
+    alpha_beta_prune: bool,
+) {
     let legal_moves = board.legal_moves(Player::White);
 
     let mut current_best_value = f32::NAN;
 
     for max_depth in 0.. {
         let mut best_value = f32::NEG_INFINITY;
-        let mut best_move = Move::new(127, Player::White);
+        let mut best_move = legal_moves[0];
 
         let mut value;
         let mut alpha = f32::NEG_INFINITY;
@@ -221,7 +120,7 @@ fn minimax_worker(board: Board, current_best_move: Arc<Mutex<Move>>, search_acti
                     false => (alpha, beta),
                 };
 
-                let their_value = minimax(&next_board, max_depth, their_alpha, their_beta);
+                let their_value = minimax(&next_board, max_depth, their_alpha, their_beta, alpha_beta_prune);
 
                 match their_move {
                     true => -their_value,
@@ -243,13 +142,15 @@ fn minimax_worker(board: Board, current_best_move: Arc<Mutex<Move>>, search_acti
                 }
             }
 
-            if value >= alpha {
-                alpha = value;
-            }
+            if alpha_beta_prune {
+                if value >= alpha {
+                    alpha = value;
+                }
 
-            if value >= beta {
-                // beta cutoff
-                break;
+                if value >= beta {
+                    // beta cutoff
+                    break;
+                }
             }
         }
 
@@ -265,13 +166,13 @@ fn minimax_worker(board: Board, current_best_move: Arc<Mutex<Move>>, search_acti
             println!("Found certain loss");
             // don't exit early if we find a certain loss: our opponent might not've :)
 
-            /* search_active.store(false, Ordering::Release);
-            return; */
+            search_active.store(false, Ordering::Release);
+            return;
         }
     }
 }
 
-pub fn minimax_search(board: &Board, thinking_dur: Duration) -> Move {
+pub fn minimax_search(board: &Board, thinking_dur: Duration, alpha_beta_prune: bool) -> Move {
     assert!(
         board.has_legal_move(),
         "Called minimax_search on board with no legal moves"
@@ -290,7 +191,12 @@ pub fn minimax_search(board: &Board, thinking_dur: Duration) -> Move {
         let worker_search_active = Arc::clone(&search_active);
 
         t_handle = std::thread::spawn(move || {
-            minimax_worker(worker_board, worker_current_best_move, worker_search_active);
+            minimax_worker(
+                worker_board,
+                worker_current_best_move,
+                worker_search_active,
+                alpha_beta_prune,
+            );
         });
     }
 

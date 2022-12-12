@@ -8,14 +8,16 @@ use crate::minimax::minimax_search;
 pub struct MinimaxAgent {
     board: Board,
     thinking_dur: Duration,
+    alpha_beta_prune: bool,
 }
 
 impl MinimaxAgent {
     #[allow(dead_code)]
-    pub fn new(h: u8, s: u16, thinking_dur: Duration) -> Self {
+    pub fn new(h: u8, s: u16, thinking_dur: Duration, alpha_beta_prune: bool) -> Self {
         MinimaxAgent {
             board: Board::new(h, s),
             thinking_dur,
+            alpha_beta_prune,
         }
     }
 }
@@ -26,6 +28,6 @@ impl Agent for MinimaxAgent {
     }
 
     fn get_move(&mut self) -> crate::Move {
-        minimax_search(&self.board, self.thinking_dur)
+        minimax_search(&self.board, self.thinking_dur, self.alpha_beta_prune)
     }
 }

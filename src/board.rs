@@ -246,6 +246,19 @@ impl Board {
             *house = 0;
         }
     }
+
+    pub fn value_heuristic(&self) -> f32 {
+        const EPS: f32 = 1.0 / u16::MAX as f32;
+
+        let our_store = self.our_store as f32;
+        let their_store = self.their_store as f32;
+
+        let our_houses_sum = self.our_houses().iter().sum::<u16>() as f32;
+        let their_houses_sum = self.their_houses().iter().sum::<u16>() as f32;
+
+        ((1.0 + EPS) * our_store /* * our_store */ + our_houses_sum)
+            - ((1.0 + EPS) * their_store /* * their_store */ + their_houses_sum)
+    }
 }
 
 impl Display for Board {
