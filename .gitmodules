@@ -1,0 +1,4 @@
+[submodule "kalah-game"]
+	path = kalah-game
+	url = https://github.com/KWARC/kalah-game
+	ignore = dirty

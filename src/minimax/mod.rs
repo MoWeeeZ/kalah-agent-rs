@@ -1,4 +1,5 @@
+mod minimax_agent;
 mod node;
 mod search;
 
-pub use search::minimax_search;
+pub use minimax_agent::MinimaxAgent;

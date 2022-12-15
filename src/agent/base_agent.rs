@@ -1,4 +1,4 @@
-use crate::board::Move;
+use crate::Move;
 
 pub trait Agent {
     fn inform_move(&mut self, move_: Move);

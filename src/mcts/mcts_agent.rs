@@ -1,3 +1,4 @@
+use crate::kalah::ValuationFn;
 use crate::mcts::Search;
 use crate::{Agent, Board, Move};
 
@@ -7,9 +8,9 @@ pub struct MctsAgent {
 
 impl MctsAgent {
     #[allow(dead_code)]
-    pub fn new(h: u8, s: u16, num_threads: u64) -> Self {
+    pub fn new(h: u8, s: u16, valuation_fn: ValuationFn, num_threads: u64) -> Self {
         let board = Board::new(h, s);
-        let mut search = Search::new(board);
+        let mut search = Search::new(board, valuation_fn);
         search.start_threads(num_threads);
 
         MctsAgent { search }

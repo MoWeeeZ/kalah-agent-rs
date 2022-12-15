@@ -2,18 +2,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 
-use rand::seq::SliceRandom;
-
+use crate::kalah::valuation::{Valuation, ValuationFn};
 use crate::mcts::node::{Edge, Node, SharedNode};
+use crate::util::math::{sample_index_weighted, softmax};
 use crate::{Board, Move};
 
 // inverse temperature for move sampling in mcts selection phase
-const SELECTION_BETA: f64 = 1.0;
+const SELECTION_BETA: f32 = 1.0;
 // mixing factor for uniform probability distribution in mcts selection phase
-const EPSILON: f64 = 0.25;
-
-// inverse temperature for next move selection
-const POLICY_BETA: f64 = 1.0;
+// const EPSILON: f32 = 0.25;
 
 /*====================================================================================================================*/
 
@@ -27,14 +24,17 @@ pub struct Search {
     // root node behind a Arc<RwLock<Node>>; this allows all threads to simultaneously traverse the game tree
     // only nodes that are currently being altered will be locked, as they all are behind RwLocks
     root_node: SharedNode,
+
+    valuation_fn: ValuationFn,
 }
 
 impl Search {
-    pub fn new(board: Board) -> Self {
+    pub fn new(board: Board, valuation_fn: ValuationFn) -> Self {
         Search {
             threads: Vec::new(),
             search_active: Arc::new(AtomicBool::new(false)),
-            root_node: Node::new_shared(board),
+            root_node: Node::new_shared(board, 0),
+            valuation_fn,
         }
     }
 
@@ -50,9 +50,10 @@ impl Search {
         for thread_id in 0..thread_count {
             let root_node = Arc::clone(&self.root_node);
             let search_active = Arc::clone(&self.search_active);
+            let valuation_fn = self.valuation_fn;
 
             self.threads.push(thread::spawn(move || {
-                let search_thread = SearchWorker::new(thread_id, root_node, search_active);
+                let search_thread = SearchWorker::new(thread_id, root_node, search_active, valuation_fn);
 
                 search_thread.run();
             }));
@@ -70,40 +71,36 @@ impl Search {
     }
 
     pub fn inform_move(&mut self, move_: Move) {
-        let node = match self.root_node.read().unwrap().get_child_node(move_) {
+        let mut node = match self.root_node.read().unwrap().get_child_node(move_) {
             Some(node) => node,
             None => {
                 let mut board = self.root_node.read().unwrap().board().clone();
+                let depth = self.root_node.read().unwrap().depth() + 1;
                 board.apply_move(move_);
-                Node::new_shared(board)
+                Node::new_shared(board, depth)
             }
         };
 
-        self.root_node = node;
+        // self.root_node = node;
 
-        // std::mem::swap(&mut self.root_node, &mut node);
+        // swap new root and old root
+        std::mem::swap(&mut self.root_node, &mut node);
 
-        // // drop old root node to make all nodes deallocate after all search threads have no reference to them anymore
-        // drop(node);
+        // drop old root on new thread so node deallocation won't block the main thread
+        let gc_thread = std::thread::spawn(move || {
+            // drop node to trigger deallocation (or not, then the droppping worker thread will have to take care of it)
+            drop(node);
+        });
+        // detach gc_thread
+        drop(gc_thread);
     }
 
     pub fn current_best_move(&self) -> Move {
-        let policy = self.root_node.read().unwrap().get_current_policy();
+        let (moves, probabilities) = self.root_node.read().unwrap().get_current_policy();
 
-        // each move with their unnormalised probability
-        let probabilities: Vec<(Move, f64)> = policy
-            .into_iter()
-            .map(|(move_, value)| (move_, (POLICY_BETA * value).exp()))
-            .collect();
+        let idx = sample_index_weighted(&probabilities);
 
-        let softmax_sum: f64 = probabilities.iter().map(|&(_, p)| p).sum();
-
-        let next_move = probabilities
-            .choose_weighted(&mut rand::thread_rng(), |&(_, p)| p / softmax_sum)
-            .unwrap()
-            .0;
-
-        next_move
+        moves[idx]
     }
 }
 
@@ -125,14 +122,22 @@ struct SearchWorker {
 
     root_node: SharedNode,
     search_active: Arc<AtomicBool>,
+
+    valuation_fn: ValuationFn,
 }
 
 impl SearchWorker {
-    pub fn new(thread_id: u64, root_node: SharedNode, search_active: Arc<AtomicBool>) -> Self {
+    pub fn new(
+        thread_id: u64,
+        root_node: SharedNode,
+        search_active: Arc<AtomicBool>,
+        valuation_fn: ValuationFn,
+    ) -> Self {
         SearchWorker {
             thread_id,
             root_node,
             search_active,
+            valuation_fn,
         }
     }
 
@@ -147,49 +152,44 @@ impl SearchWorker {
         println!("Search thread {} starting up.", self.thread_id);
 
         while self.search_active.load(Ordering::Acquire) {
-            SearchWorker::mcts_iteration(self.root_node.clone());
+            self.mcts_iteration(self.root_node.clone());
         }
 
         println!("Search thread {} shutting down.", self.thread_id);
     }
 
     //
-    fn mcts_iteration(node: SharedNode) -> f64 {
-        let next_edge;
+    fn mcts_iteration(&self, node: SharedNode) -> Valuation {
+        // select next move
+        let next_edge: Edge;
 
         // region in which node is read-locked
         {
             let node = node.read().unwrap();
             // each move with their respective value
-            let values = node.get_current_edge_values();
+            let (edges, values) = node.get_current_edge_values();
             // each move with their unnormalised probability
-            let probabilities: Vec<(&Edge, f64)> = values
-                .into_iter()
-                .map(|(edge, value)| (edge, (SELECTION_BETA * value).exp()))
-                .collect();
 
-            let softmax_sum: f64 = probabilities.iter().map(|&(_, p)| p).sum();
+            let probabilities = softmax(&values, SELECTION_BETA);
 
-            let uni_prob = 1.0 / probabilities.len() as f64;
+            // let uni_prob = 1.0 / probabilities.len() as f32;
 
-            next_edge = probabilities
-                .choose_weighted(&mut rand::thread_rng(), |&(_, p)| {
-                    (1.0 - EPSILON) * (p / softmax_sum) + EPSILON * uni_prob
-                })
-                .unwrap()
-                .0
-                .clone();
+            // mix probability from edge value with uniform probability
+            /* for p in probabilities.iter_mut() {
+                *p = (1.0 - EPSILON) * (*p) + EPSILON * uni_prob;
+            } */
 
-            // drop node and probablilities to unlock other edges
-            drop(probabilities);
+            // sample from edges using probabilities as weights
+            let idx = sample_index_weighted(&probabilities);
+            next_edge = edges[idx].clone();
         }
 
         // backpropagated v from terminal node
         let v = match next_edge.child_node() {
             // we're an inner node => keep moving down the tree
-            Some(next_node) => SearchWorker::mcts_iteration(next_node),
+            Some(next_node) => self.mcts_iteration(next_node),
             // child_node of edge does not exist => we've hit a leaf node => expand
-            None => SearchWorker::expand_node(Arc::clone(&node), next_edge.get_move()),
+            None => self.expand_node(Arc::clone(&node), next_edge.get_move()),
         };
 
         // lock node and update all its edges
@@ -198,7 +198,30 @@ impl SearchWorker {
         v
     }
 
-    fn expand_node(_node: SharedNode, _move_: Move) -> f64 {
-        todo!()
+    fn expand_node(&self, parent_node: SharedNode, next_move: Move) -> Valuation {
+        // write-lock parent_node for entire function
+        let mut parent_node = parent_node.write().unwrap();
+
+        let edge = parent_node.get_edge(next_move);
+        if edge.child_node().is_some() {
+            // race condition: 2 threads both selected the same node for expansion and called expand_node
+            // this is the slower thread: the node is already expanded, so simply return its q_value
+
+            return edge.q_value();
+        }
+
+        let mut next_board = parent_node.board().clone();
+        let depth = parent_node.depth();
+
+        next_board.apply_move(next_move);
+
+        // let v = next_board.valuation();
+        let v = (self.valuation_fn)(&next_board);
+
+        let node = Node::new_shared(next_board, depth);
+
+        parent_node.get_edge_mut(next_move).set_child_node(node);
+
+        v
     }
 }

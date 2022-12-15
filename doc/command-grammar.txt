@@ -1,0 +1,10 @@
+command		= id name *( 1*WSP argument ) CRLF
+id			= [1*DIGIT [ref] 1*WSP]
+ref			= "@" 1*DIGIT
+name		= 1*(DIGIT / ALPHA)
+argument	= integer / real / word / string / board
+integer		= ["+" / "-"] 1*DIGIT
+real		= ["+" / "-"] 1*DIGIT "." 1*DIGIT
+word		= 1*( DIGIT / ALPHA / "-" / ":" )
+string		= DQUOTE *( ("\" CHAR) / NDQCHAR ) DQUOTE
+board		= "<" 1*DIGIT *( "," 1*DIGIT ) ">"

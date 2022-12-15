@@ -11,6 +11,7 @@ pub enum Player {
     Black,
 }
 
+// flip the player, i.e. White -> Black and Black -> White
 impl std::ops::Not for Player {
     type Output = Player;
 
@@ -35,6 +36,8 @@ impl Display for Player {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Move {
+    // bytes 0..6 : number of house the move starts from
+    // bytes 7 : whether the move is by White or Black
     data: u8,
 }
 
@@ -55,7 +58,7 @@ impl Move {
     }
 
     pub fn player(&self) -> Player {
-        if ((self.data & 0b1000_0000) >> 7) == 0 {
+        if (self.data & 0b1000_0000) == 0 {
             Player::White
         } else {
             Player::Black
@@ -81,52 +84,147 @@ impl Debug for Move {
 
 /*====================================================================================================================*/
 
-#[derive(Clone)]
+// should be 16 bytes in size
+// as we need 9 bytes anyways (for houses and flipped) and the alignment is 8, we can use the remaining 7 padding bytes
 pub struct Board {
-    houses: Box<[House]>,
+    // houses: Box<[House]>,
+    // reduces the size of Board from 24 bytes to 16 bytes
+    // we already know the size of the array is 2*h and we can squeeze it in later as an u8
+    houses_ptr: *mut House,
 
     pub our_store: u16,
     pub their_store: u16,
 
+    h: u8,
+
     flipped: bool,
 }
+
+unsafe impl Send for Board {}
+unsafe impl Sync for Board {}
 
 impl Board {
     pub fn new(h: u8, s: House) -> Self {
         assert!(h <= 128, "Can't create more than 128 houses");
 
-        let houses = vec![s; 2 * h as usize].into_boxed_slice();
+        let mut houses_vec: Vec<u16> = vec![s; 2 * h as usize];
+
+        assert!(houses_vec.len() == houses_vec.capacity());
+
+        let houses = houses_vec.as_mut_ptr();
+
+        std::mem::forget(houses_vec);
+
         Board {
             // houses: vec![s; 2 * h as usize],
-            houses,
+            houses_ptr: houses,
             our_store: 0,
             their_store: 0,
+            h,
             flipped: false,
         }
     }
 
+    pub fn from_kpg(kpg: &str) -> Self {
+        let kpg: String = kpg.chars().filter(|c| !c.is_whitespace()).collect();
+
+        let mut nums = kpg.strip_prefix('<').unwrap().strip_suffix('>').unwrap().split(',');
+
+        let h: u8 = nums.next().unwrap().parse().unwrap();
+
+        let our_store: u16 = nums.next().unwrap().parse().unwrap();
+        let their_store: u16 = nums.next().unwrap().parse().unwrap();
+
+        let mut houses_vec: Vec<u16> = nums.map(|num_s| num_s.parse().unwrap()).collect();
+
+        assert_eq!(houses_vec.len(), 2 * h as usize, "{:?}", houses_vec);
+
+        houses_vec.shrink_to_fit();
+
+        assert_eq!(houses_vec.capacity(), 2 * h as usize);
+
+        let houses_ptr = houses_vec.as_mut_ptr();
+
+        std::mem::forget(houses_vec);
+
+        Board {
+            houses_ptr,
+            our_store,
+            their_store,
+            h,
+            flipped: false,
+        }
+    }
+
+    pub fn to_kgp(&self) -> String {
+        use std::fmt::Write;
+
+        let mut s = String::new();
+
+        match self.flipped {
+            false => {
+                write!(s, "<{}, {}, {}", self.h(), self.our_store, self.their_store).unwrap();
+
+                for seeds in self.our_houses() {
+                    write!(s, ", {}", seeds).unwrap();
+                }
+                for seeds in self.their_houses() {
+                    write!(s, ", {}", seeds).unwrap();
+                }
+
+                write!(s, ">").unwrap();
+            }
+            true => {
+                write!(s, "<{}, {}, {}", self.h(), self.their_store, self.our_store).unwrap();
+
+                for seeds in self.their_houses() {
+                    write!(s, ", {}", seeds).unwrap();
+                }
+                for seeds in self.our_houses() {
+                    write!(s, ", {}", seeds).unwrap();
+                }
+
+                write!(s, ">").unwrap();
+            }
+        }
+
+        s
+    }
+
     pub fn h(&self) -> u8 {
-        (self.houses.len() / 2) as u8
+        self.h
+    }
+
+    pub fn our_store(&self) -> u16 {
+        self.our_store
+    }
+
+    pub fn their_store(&self) -> u16 {
+        self.their_store
     }
 
     pub fn our_houses(&self) -> &[House] {
-        let h = self.h() as usize;
-        &self.houses[..h]
+        // let h = self.h() as usize;
+        // &self.houses[..h]
+        unsafe { std::slice::from_raw_parts(self.houses_ptr, self.h as usize) }
     }
 
     pub fn our_houses_mut(&mut self) -> &mut [House] {
-        let h = self.h() as usize;
-        &mut self.houses[..h]
+        // let h = self.h() as usize;
+        // &mut self.houses[..h]
+        unsafe { std::slice::from_raw_parts_mut(self.houses_ptr, self.h as usize) }
     }
 
     pub fn their_houses(&self) -> &[House] {
-        let h = self.h() as usize;
-        &self.houses[h..]
+        // let h = self.h() as usize;
+        // &self.houses[h..]
+        unsafe { std::slice::from_raw_parts(self.houses_ptr.add(self.h as usize), self.h as usize) }
     }
 
     pub fn their_houses_mut(&mut self) -> &mut [House] {
-        let h = self.h() as usize;
-        &mut self.houses[h..]
+        // let h = self.h() as usize;
+        // &mut self.houses[h..]
+        unsafe { std::slice::from_raw_parts_mut(self.houses_ptr.add(self.h as usize), self.h as usize) }
     }
 
     pub fn flipped(&self) -> bool {
@@ -138,7 +236,7 @@ impl Board {
 
         unsafe {
             for i in 0..h {
-                std::ptr::swap(self.houses.as_mut_ptr().add(i), self.houses.as_mut_ptr().add(h + i));
+                std::ptr::swap(self.houses_ptr.add(i), self.houses_ptr.add(h + i));
             }
         }
 
@@ -172,9 +270,17 @@ impl Board {
             seeds_in_hand -= 1;
 
             if seeds_in_hand == 0 {
-                if self.our_houses()[i] == 1 {
-                    self.our_store += self.our_houses()[i];
+                // if our house was empty and their opposing house is not
+                if self.our_houses()[i] == 1 && self.their_houses_mut()[h - i] != 0 {
+                    // move seed from our house and all seeds from their house to our store
+                    self.our_store += 1 + self.their_houses()[h - i - 1];
+
                     self.our_houses_mut()[i] = 0;
+                    self.their_houses_mut()[h - i - 1] = 0;
+                }
+
+                if !self.has_legal_move() {
+                    self.finish_game();
                 }
 
                 return false;
@@ -188,6 +294,10 @@ impl Board {
             seeds_in_hand -= 1;
 
             if seeds_in_hand == 0 {
+                if !self.has_legal_move() {
+                    self.finish_game();
+                }
+
                 return true;
             }
 
@@ -197,6 +307,10 @@ impl Board {
                 seeds_in_hand -= 1;
 
                 if seeds_in_hand == 0 {
+                    if !self.has_legal_move() {
+                        self.finish_game();
+                    }
+
                     return false;
                 }
             }
@@ -209,9 +323,17 @@ impl Board {
                 seeds_in_hand -= 1;
 
                 if seeds_in_hand == 0 {
-                    if self.our_houses()[i] == 1 {
-                        self.our_store += self.our_houses()[i];
+                    // if our house was empty and their opposing house is not
+                    if self.our_houses()[i] == 1 && self.their_houses_mut()[h - i - 1] != 0 {
+                        // move seed from our house and all seeds from their house to our store
+                        self.our_store += 1 + self.their_houses()[h - i - 1];
+
                         self.our_houses_mut()[i] = 0;
+                        self.their_houses_mut()[h - i - 1] = 0;
+                    }
+
+                    if !self.has_legal_move() {
+                        self.finish_game();
                     }
 
                     return false;
@@ -242,42 +364,8 @@ impl Board {
         self.our_store += self.our_houses().iter().sum::<u16>();
         self.their_store += self.their_houses().iter().sum::<u16>();
 
-        for house in self.houses.iter_mut() {
-            *house = 0;
-        }
-    }
-
-    pub fn value_heuristic(&self) -> Valuation {
-        use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
-
-        // const EPS: f32 = 1.0 / u16::MAX as f32;
-        const EPS: f32 = 1e-5;
-
-        let our_store = self.our_store as f32;
-        let their_store = self.their_store as f32;
-
-        let our_houses_sum = self.our_houses().iter().sum::<u16>() as f32;
-        let their_houses_sum = self.their_houses().iter().sum::<u16>() as f32;
-
-        if !self.has_legal_move() {
-            // no move left -> this is a terminal node
-            // meaning the player with more seeds in their store wins the game
-            // thus if White has more seeds in the store (i.e. score_diff > 0) this node is a guaranteed win
-            // and vice versa. If both have the same number, it's a draw with value 0.0
-            let score_diff = our_store + our_houses_sum - their_store - their_houses_sum;
-
-            return match score_diff {
-                val if val > 0.0 => TerminalWhiteWin { plies: 0 },
-                val if val < 0.0 => TerminalBlackWin { plies: 0 },
-                val if val == 0.0 => TerminalDraw { plies: 0 },
-                val => panic!("Value has invalid value {}", val),
-            };
-        }
-
-        let score = ((1.0 + EPS) * our_store /* * our_store */ + our_houses_sum)
-            - ((1.0 + EPS) * their_store /* * their_store */ + their_houses_sum);
-
-        NonTerminal { value: score.tanh() }
+        self.our_houses_mut().fill(0);
+        self.their_houses_mut().fill(0);
     }
 }
 
@@ -299,84 +387,35 @@ impl Display for Board {
     }
 }
 
-/*====================================================================================================================*/
+impl Clone for Board {
+    fn clone(&self) -> Self {
+        // recreate houses Vec
+        let houses = unsafe { Vec::from_raw_parts(self.houses_ptr, 2 * self.h as usize, 2 * self.h as usize) };
 
-/// assertion: value will never be f32::NAN, making it comparable
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Valuation {
-    NonTerminal { value: f32 },
-    TerminalWhiteWin { plies: u32 },
-    TerminalBlackWin { plies: u32 },
-    TerminalDraw { plies: u32 },
-}
+        // clone houses Vec and get pointer to its buffer
+        let mut houses_clone = houses.clone();
+        assert!(houses_clone.capacity() == 2 * self.h as usize);
+        let houses_clone_ptr = houses_clone.as_mut_ptr();
 
-impl Valuation {
-    pub fn advance_step(self) -> Valuation {
-        use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
+        // forget houses and houses_clone Vecs
+        std::mem::forget(houses);
+        std::mem::forget(houses_clone);
 
-        match self {
-            NonTerminal { .. } => self,
-            TerminalWhiteWin { plies: steps } => TerminalWhiteWin { plies: steps + 1 },
-            TerminalBlackWin { plies: steps } => TerminalBlackWin { plies: steps + 1 },
-            TerminalDraw { plies: steps } => TerminalDraw { plies: steps + 1 },
+        Self {
+            houses_ptr: houses_clone_ptr,
+            our_store: self.our_store,
+            their_store: self.their_store,
+            h: self.h,
+            flipped: self.flipped,
         }
     }
 }
 
-/// flip the player perspective of the valuation
-impl std::ops::Neg for Valuation {
-    type Output = Valuation;
-
-    fn neg(self) -> Self::Output {
-        use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
-
-        match self {
-            NonTerminal { value } => NonTerminal { value: -value },
-            TerminalWhiteWin { plies: steps } => TerminalBlackWin { plies: steps },
-            TerminalBlackWin { plies: steps } => TerminalWhiteWin { plies: steps },
-            TerminalDraw { plies: steps } => TerminalDraw { plies: steps },
-        }
-    }
-}
-
-impl Eq for Valuation {
-    fn assert_receiver_is_total_eq(&self) {}
-}
-
-impl PartialOrd for Valuation {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-/// compare valuations from the perspective of White
-impl Ord for Valuation {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        use std::cmp::Ordering::{Greater, Less};
-        use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
-
-        match (self, other) {
-            // pick Valuation with higher value
-            (NonTerminal { value: val1 }, NonTerminal { value: val2 }) => val1.partial_cmp(val2).unwrap(),
-            (NonTerminal { .. }, TerminalWhiteWin { .. }) => Less,
-            (NonTerminal { .. }, TerminalBlackWin { .. }) => Greater,
-            (NonTerminal { value }, TerminalDraw { .. }) => value.partial_cmp(&0.0).unwrap(),
-            (TerminalWhiteWin { .. }, NonTerminal { .. }) => Greater,
-            // pick Valuation with less steps until win
-            (TerminalWhiteWin { plies: s1 }, TerminalWhiteWin { plies: s2 }) => s1.cmp(s2).reverse(),
-            (TerminalWhiteWin { .. }, TerminalBlackWin { .. }) => Greater,
-            (TerminalWhiteWin { .. }, TerminalDraw { .. }) => Greater,
-            (TerminalBlackWin { .. }, NonTerminal { .. }) => Less,
-            (TerminalBlackWin { .. }, TerminalWhiteWin { .. }) => Less,
-            // pick Valuation with more steps until loss: opponent might make mistake and lose certain win
-            (TerminalBlackWin { plies: s1 }, TerminalBlackWin { plies: s2 }) => s1.cmp(s2),
-            (TerminalBlackWin { .. }, TerminalDraw { .. }) => Less,
-            (TerminalDraw { .. }, NonTerminal { value }) => (0.0).partial_cmp(value).unwrap(),
-            (TerminalDraw { .. }, TerminalWhiteWin { .. }) => Less,
-            (TerminalDraw { .. }, TerminalBlackWin { .. }) => Greater,
-            // pick Valuation with more steps until draw: opponent might make mistake and lose certain draw
-            (TerminalDraw { plies: s1 }, TerminalDraw { plies: s2 }) => s1.cmp(s2).reverse(),
-        }
+impl Drop for Board {
+    fn drop(&mut self) {
+        // recreate houses Vec and drop it
+        let houses_vec = unsafe { Vec::from_raw_parts(self.houses_ptr, 2 * self.h as usize, 2 * self.h as usize) };
+        drop(houses_vec);
     }
 }
 
@@ -431,5 +470,22 @@ mod tests {
 
         assert!(board.our_store == 24);
         assert!(board.their_store == 42);
+    }
+
+    #[test]
+    fn test_from_to_kpg() {
+        let kpg = "<3, 2, 3, 11, 12, 13, 21, 22, 23>";
+
+        let board = Board::from_kpg(kpg);
+
+        assert_eq!(board.h(), 3);
+
+        assert_eq!(board.our_store(), 2);
+        assert_eq!(board.their_store(), 3);
+
+        assert_eq!(board.our_houses(), &[11, 12, 13]);
+        assert_eq!(board.their_houses(), &[21, 22, 23]);
+
+        assert_eq!(board.to_kgp(), kpg);
     }
 }

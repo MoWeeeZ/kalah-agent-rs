@@ -4,10 +4,12 @@ use std::time::{Duration, Instant};
 
 use rand::{thread_rng, Rng};
 
-use crate::board::Valuation;
+use crate::kalah::valuation::{Valuation, ValuationFn};
 use crate::{Board, Move, Player};
 
 struct MinimaxWorker {
+    valuation_fn: ValuationFn,
+
     total_nodes_visited: u64,
     alpha_beta_prune: bool,
 
@@ -15,24 +17,25 @@ struct MinimaxWorker {
 }
 
 impl MinimaxWorker {
-    pub fn new(alpha_beta_prune: bool) -> Self {
+    pub fn new(valuation_fn: ValuationFn, alpha_beta_prune: bool) -> Self {
         MinimaxWorker {
+            valuation_fn,
             total_nodes_visited: 0,
             alpha_beta_prune,
             start_t: Instant::now(),
         }
     }
 
-    fn current_nps(&self) -> f64 {
-        let stop_t = std::time::Instant::now();
-        self.total_nodes_visited as f64 / (stop_t - self.start_t).as_secs_f64()
-    }
+    /* fn current_nps(&self) -> f64 {
+        self.total_nodes_visited as f64 / self.start_t.elapsed().as_secs_f64()
+    } */
 
     fn minimax(&mut self, board: &Board, remaining_depth: u32, alpha: Valuation, beta: Valuation) -> Valuation {
         self.total_nodes_visited += 1;
 
         if remaining_depth == 0 || !board.has_legal_move() {
-            return board.value_heuristic();
+            // return board.valuation();
+            return (self.valuation_fn)(board);
         }
 
         let legal_moves = board.legal_moves(Player::White);
@@ -59,8 +62,8 @@ impl MinimaxWorker {
                 let their_value = self.minimax(&next_board, remaining_depth - 1, their_alpha, their_beta);
 
                 match their_next_move {
-                    true => -their_value.advance_step(),
-                    false => their_value.advance_step(),
+                    true => -their_value.increase_depth(),
+                    false => their_value.increase_depth(),
                 }
             };
 
@@ -93,7 +96,7 @@ impl MinimaxWorker {
 
         let legal_moves = board.legal_moves(Player::White);
 
-        let mut current_best_value = TerminalBlackWin { plies: 0 };
+        let mut current_best_value /* = TerminalBlackWin { plies: 0 } */;
 
         for max_depth in 0.. {
             let mut best_value = TerminalBlackWin { plies: 0 };
@@ -106,12 +109,12 @@ impl MinimaxWorker {
             for current_move in legal_moves.iter() {
                 if !search_active.load(Ordering::Acquire) {
                     // since max_depth search never completed: max_depth - 1
-                    println!("--------------------------------------------");
+                    /* println!("--------------------------------------------");
                     println!("* Minimax worker exited after max_depth {}", max_depth - 1);
                     println!("* Best move had value {:?}", current_best_value);
                     println!("* NPS: {:.2e}", me.current_nps());
                     println!("* alpha-beta pruning: {}", me.alpha_beta_prune);
-                    println!("--------------------------------------------\n");
+                    println!("--------------------------------------------\n"); */
                     return;
                 }
 
@@ -138,14 +141,14 @@ impl MinimaxWorker {
 
                 // replace if value is either better or the same and wins a coin flip
                 // (to make decision non-deterministic in that case)
-                if value > best_value || value == best_value && thread_rng().gen::<f64>() > 0.5 {
+                if value > best_value || value == best_value && thread_rng().gen::<bool>() {
                     best_value = value;
                     best_move = *current_move;
 
-                    if let Valuation::TerminalWhiteWin { plies } = best_value {
-                        println!("--------------------------------------------");
+                    if let Valuation::TerminalWhiteWin { .. } = best_value {
+                        /* println!("--------------------------------------------");
                         println!("* Found certain win in {} plies", plies);
-                        println!("--------------------------------------------\n");
+                        println!("--------------------------------------------\n"); */
                         *current_best_move.lock().unwrap() = best_move;
                         search_active.store(false, Ordering::Release);
                         return;
@@ -172,11 +175,11 @@ impl MinimaxWorker {
                 max_depth, best_value, alpha, beta
             ); */
 
-            if let TerminalBlackWin { plies } = current_best_value {
-                println!("--------------------------------------------");
+            if let TerminalBlackWin { .. } = current_best_value {
+                /* println!("--------------------------------------------");
                 println!("* Found certain loss in {} plies", plies);
                 println!("--------------------------------------------");
-                println!();
+                println!(); */
                 // don't exit early if we find a certain loss: our opponent might not've :)
 
                 search_active.store(false, Ordering::Release);
@@ -188,7 +191,12 @@ impl MinimaxWorker {
 
 /*====================================================================================================================*/
 
-pub fn minimax_search(board: &Board, thinking_dur: Duration, alpha_beta_prune: bool) -> Move {
+pub fn minimax_search(
+    board: &Board,
+    valuation_fn: ValuationFn,
+    thinking_dur: Duration,
+    alpha_beta_prune: bool,
+) -> Move {
     assert!(
         board.has_legal_move(),
         "Called minimax_search on board with no legal moves"
@@ -207,7 +215,7 @@ pub fn minimax_search(board: &Board, thinking_dur: Duration, alpha_beta_prune: b
         let worker_search_active = Arc::clone(&search_active);
 
         t_handle = std::thread::spawn(move || {
-            let worker = MinimaxWorker::new(alpha_beta_prune);
+            let worker = MinimaxWorker::new(valuation_fn, alpha_beta_prune);
             worker.start_search(worker_board, worker_current_best_move, worker_search_active);
         });
     }
