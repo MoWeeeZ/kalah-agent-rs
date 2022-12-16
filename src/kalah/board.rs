@@ -387,6 +387,12 @@ impl Display for Board {
     }
 }
 
+impl Debug for Board {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_kgp())
+    }
+}
+
 impl Clone for Board {
     fn clone(&self) -> Self {
         // recreate houses Vec

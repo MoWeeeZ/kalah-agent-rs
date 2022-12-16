@@ -8,5 +8,6 @@ lazy_static = "1.4"
 num_cpus = "1.14"
 rand = "0.8"
 regex = "1.7"
-threadpool = "1.8.1"
-tungstenite = "0.18"
+threadpool = "1.8"
+tungstenite = { version = "0.18", features = ["native-tls"] }
+url = "2.3"

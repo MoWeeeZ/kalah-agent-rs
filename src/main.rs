@@ -4,13 +4,14 @@ use std::time::Duration;
 
 mod agent;
 mod kalah;
+mod kgp;
 mod mcts;
 mod minimax;
-mod network;
 mod util;
 
 use agent::Agent;
 pub use kalah::{Board, Move, Player};
+use kgp::{Command, Connection};
 use threadpool::ThreadPool;
 
 fn single_ply(
@@ -95,18 +96,39 @@ fn game_loop(board: Board, white_agent: impl Agent, black_agent: impl Agent, pri
     board
 }
 
-fn main() {
-    let h = 6;
-    let s = 4;
+pub fn play_game<WhiteAgent, BlackAgent>(h: u8, s: u16, white_agent: WhiteAgent, black_agent: BlackAgent)
+where
+    WhiteAgent: Agent,
+    BlackAgent: Agent,
+{
+    let board = Board::new(h, s);
 
+    let board = game_loop(board, white_agent, black_agent, true);
+
+    println!("\nFinal board:\n\n{}\n", board);
+
+    match board.our_store.cmp(&board.their_store) {
+        std::cmp::Ordering::Less => println!("Black won."),
+        std::cmp::Ordering::Equal => println!("Draw."),
+        std::cmp::Ordering::Greater => println!("White won."),
+    }
+}
+
+pub fn test_agents<WhiteAgent, BlackAgent>(
+    h: u8,
+    s: u16,
+    white_agent_builder: &dyn Fn() -> WhiteAgent,
+    black_agent_builder: &dyn Fn() -> BlackAgent,
+    num_runs: usize,
+) where
+    WhiteAgent: Agent + Send + 'static,
+    BlackAgent: Agent + Send + 'static,
+{
     let num_workers = 8;
-    let num_runs = num_workers * 50;
 
     let white_wins = Arc::new(AtomicU64::new(0));
     let black_wins = Arc::new(AtomicU64::new(0));
     let draws = Arc::new(AtomicU64::new(0));
-
-    let thinking_duration = Duration::from_secs(1);
 
     let pool = ThreadPool::new(num_workers);
 
@@ -115,13 +137,8 @@ fn main() {
     for _ in 0..num_runs {
         let board = Board::new(h, s);
 
-        let white_agent =
-            minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::seed_diff_valuation);
-        // let white_agent = agent::MctsAgent::new(h, s, 2);
-
-        // let black_agent = agent::RandomAgent::new(h, s);
-        let black_agent =
-            minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::store_diff_valuation);
+        let white_agent = white_agent_builder();
+        let black_agent = black_agent_builder();
 
         let white_wins = Arc::clone(&white_wins);
         let black_wins = Arc::clone(&black_wins);
@@ -145,12 +162,83 @@ fn main() {
     println!("White wins: {}", white_wins.load(Ordering::Acquire));
     println!("Draws:      {}", draws.load(Ordering::Acquire));
     println!("Black wins: {}", black_wins.load(Ordering::Acquire));
+}
 
-    /* println!("\nFinal board:\n\n{}\n", board);
+fn kgp_connect(url: &str) {
+    let mut conn = Connection::new(url).expect("Failed to connect");
 
-    match board.our_store.cmp(&board.their_store) {
-        std::cmp::Ordering::Less => println!("Black won."),
-        std::cmp::Ordering::Equal => println!("Draw."),
-        std::cmp::Ordering::Greater => println!("White won."),
-    } */
+    // let name = "Sauerkraut";
+    // let authors = "";
+    // let description = "";
+    // let token = "";
+
+    loop {
+        let cmd: Command = match conn.read_command() {
+            Ok(cmd) => cmd,
+            Err(err) => match err {
+                tungstenite::Error::Io(_) => {
+                    std::thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
+                _ => {
+                    eprintln!("Couldn't read command: {}", err);
+                    return;
+                }
+            },
+        };
+
+        println!("{:?}", cmd);
+
+        match cmd {
+            Command::Kpg {
+                id,
+                ref_id: _,
+                major,
+                minor,
+                patch,
+            } => {
+                if major != 1 {
+                    conn.write_command("error protocol not supported", id);
+                    eprintln!("Server tried to use unsupported protocol {}.{}.{}", major, minor, patch);
+                    return;
+                }
+
+                // TODO: send server name, authoers and token
+                // conn.write_command(&format!("set info:name {}", name), None);
+                // conn.write_command(&format!("set info:authors {}", authors), None);
+                // conn.write_command(&format!("set info:description {}", description), None);
+                // conn.write_command(&format!("set info:token {}", token), None);
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+fn main() {
+    /* let h = 6;
+    let s = 4;
+
+    let thinking_duration = Duration::from_secs(1);
+
+    let white_agent = minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::seed_diff_valuation);
+    // let white_agent = agent::MctsAgent::new(h, s, 2);
+
+    // let black_agent = agent::RandomAgent::new(h, s);
+    let black_agent = minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::store_diff_valuation);
+
+    play_game(h, s, white_agent, black_agent); */
+
+    /* let url = "wss://kalah.kwarc.info/socket";
+
+    let conn = match Connection::new(url) {
+        Ok(conn) => conn,
+        Err(err) => {
+            println!("Error: {}", err);
+            return;
+        }
+    }; */
+
+    let url = "wss://kalah.kwarc.info/socket";
+
+    kgp_connect(url);
 }

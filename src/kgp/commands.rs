@@ -5,42 +5,43 @@ use regex::Regex;
 
 use crate::Board;
 
+#[derive(Debug)]
 pub enum Command {
     Kpg {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
         major: u8,
         minor: u8,
         patch: u8,
     },
     State {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
         board: Board,
     },
     Stop {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
     },
     Ok {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
     },
     Ping {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
     },
     Pong {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
     },
     Goodbye {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
     },
     Error {
         id: Option<u32>,
-        id_ref: Option<u32>,
+        ref_id: Option<u32>,
         msg: String,
     },
 }
@@ -48,7 +49,7 @@ pub enum Command {
 // from kalah-game/client/pykgp/kgp.py
 lazy_static! {
     static ref COMMAND_REGEX: Regex = Regex::new(
-        r"
+        &r"
 ^                   
 \s*                 
 (?:                 
@@ -61,8 +62,9 @@ lazy_static! {
     \s+                 
     (?P<args>.*?)       
 )?
+\s*
 $                
-",
+".chars().filter(|c| !c.is_whitespace()).collect::<String>(),
     )
     .unwrap();
     // static ref KGP_REGEX: Regex = Regex::new(r"^(?P<major>\d+)\s*(?P<minor>\d+)\s*(?P<patch>\d+)\s*$").unwrap();
@@ -73,7 +75,9 @@ impl FromStr for Command {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let command_captures = COMMAND_REGEX.captures(s).ok_or("command didn't match regex")?;
+        let command_captures = COMMAND_REGEX
+            .captures(s)
+            .ok_or(format!("command \"{}\" didn't match regex", s))?;
 
         let id = command_captures
             .name("id")
@@ -115,7 +119,7 @@ impl FromStr for Command {
 
                 Ok(Command::Kpg {
                     id,
-                    id_ref,
+                    ref_id: id_ref,
                     major,
                     minor,
                     patch,
@@ -124,16 +128,20 @@ impl FromStr for Command {
             "state" => {
                 let board = Board::from_kpg(args_vec[0]);
 
-                Ok(Command::State { id, id_ref, board })
+                Ok(Command::State {
+                    id,
+                    ref_id: id_ref,
+                    board,
+                })
             }
-            "stop" => Ok(Command::Stop { id, id_ref }),
-            "ok" => Ok(Command::Ok { id, id_ref }),
-            "ping" => Ok(Command::Ping { id, id_ref }),
-            "pong" => Ok(Command::Pong { id, id_ref }),
-            "goodbye" => Ok(Command::Goodbye { id, id_ref }),
+            "stop" => Ok(Command::Stop { id, ref_id: id_ref }),
+            "ok" => Ok(Command::Ok { id, ref_id: id_ref }),
+            "ping" => Ok(Command::Ping { id, ref_id: id_ref }),
+            "pong" => Ok(Command::Pong { id, ref_id: id_ref }),
+            "goodbye" => Ok(Command::Goodbye { id, ref_id: id_ref }),
             "error" => Ok(Command::Error {
                 id,
-                id_ref,
+                ref_id: id_ref,
                 msg: args_vec[0].to_owned(),
             }),
             _ => Err(format!("Unknown command {}", cmd)),

@@ -8,6 +8,7 @@ pub struct StoreDiffValuator {} */
 
 pub type ValuationFn = fn(&Board) -> Valuation;
 
+#[allow(dead_code)]
 pub fn store_diff_valuation(board: &Board) -> Valuation {
     use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
 
@@ -45,6 +46,7 @@ pub fn store_diff_valuation(board: &Board) -> Valuation {
     }
 }
 
+#[allow(dead_code)]
 pub fn seed_diff_valuation(board: &Board) -> Valuation {
     use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
 
