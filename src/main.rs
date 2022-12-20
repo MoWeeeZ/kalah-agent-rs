@@ -101,7 +101,7 @@ where
 {
     let board = Board::new(h, s);
 
-    let board = game_loop(board, white_agent, black_agent, false);
+    let board = game_loop(board, white_agent, black_agent, true);
 
     println!("\nFinal board:\n\n{}\n", board);
 

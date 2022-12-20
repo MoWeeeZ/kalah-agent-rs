@@ -245,7 +245,7 @@ impl Board {
         self.flipped = !self.flipped
     }
 
-    /* pub fn apply_move(&mut self, move_: Move) -> bool {
+    pub fn apply_move(&mut self, move_: Move) -> bool {
         assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
 
         if move_.player() == Player::Black {
@@ -340,13 +340,13 @@ impl Board {
                 }
             }
         }
-    } */
+    }
 
     /// new implementation of apply_move; should (hopefully) be faster than the other one
     /// no time to test, but would make sense since it doesn't have to do big loop?
     /// also much prettier and easier to understand
     /// UPDATE: after testing, it's NOT faster :\
-    pub fn apply_move(&mut self, move_: Move) -> bool {
+    /* pub fn apply_move(&mut self, move_: Move) -> bool {
         assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
 
         if move_.player() == Player::Black {
@@ -389,13 +389,12 @@ impl Board {
         }
 
         // our houses after starting house
-        let iter = self
+        for our_house in self
             .our_houses_mut()
             .iter_mut()
             .skip(start_house + 1) // skip until after starting house
-            .take(rem);
-
-        for our_house in iter {
+            .take(rem)
+        {
             *our_house += 1;
             rem -= 1;
         }
@@ -427,7 +426,7 @@ impl Board {
         // h : our_store
         // (h+1)..(2h+1) : their_house[i - h - 1] (not relevant)
         let h = h as usize; // only used for indexing from here on, so 'convert' to usize once
-        let last_house_idx = (seeds_in_hand as usize + cycle_length as usize - start_house) % cycle_length as usize;
+        let last_house_idx = (start_house + seeds_in_hand as usize) % cycle_length as usize;
 
         // last seed in our house && our house was empty && opposite house if not empty:
         if last_house_idx < h
@@ -446,7 +445,7 @@ impl Board {
 
         // if last seed in our store -> true (bonus move), else -> false
         last_house_idx == h
-    }
+    } */
 
     pub fn legal_moves(&self, player: Player) -> Vec<Move> {
         let houses = match player {
