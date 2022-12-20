@@ -389,13 +389,12 @@ impl Board {
         }
 
         // our houses after starting house
-        let iter = self
+        for our_house in self
             .our_houses_mut()
             .iter_mut()
             .skip(start_house + 1) // skip until after starting house
-            .take(rem);
-
-        for our_house in iter {
+            .take(rem)
+        {
             *our_house += 1;
             rem -= 1;
         }
@@ -427,7 +426,7 @@ impl Board {
         // h : our_store
         // (h+1)..(2h+1) : their_house[i - h - 1] (not relevant)
         let h = h as usize; // only used for indexing from here on, so 'convert' to usize once
-        let last_house_idx = (seeds_in_hand as usize + cycle_length as usize - start_house) % cycle_length as usize;
+        let last_house_idx = (start_house + seeds_in_hand as usize) % cycle_length as usize;
 
         // last seed in our house && our house was empty && opposite house if not empty:
         if last_house_idx < h
