@@ -1,12 +1,13 @@
 use rand::{thread_rng, Rng};
 
+#[allow(dead_code)]
 pub fn softmax(nums: &[f32], beta: f32) -> Vec<f32> {
     let mut num_vec = Vec::new();
     num_vec.extend_from_slice(nums);
 
     let nums: &mut [f32] = &mut num_vec;
 
-    let max_num = *nums.iter().max_by(|&x, &y| x.total_cmp(y)).unwrap();
+    let max_num = *nums.iter().max_by(|&x, &y| x.partial_cmp(y).unwrap()).unwrap();
 
     for num in nums.iter_mut() {
         *num -= max_num;
@@ -23,6 +24,7 @@ pub fn softmax(nums: &[f32], beta: f32) -> Vec<f32> {
     num_vec
 }
 
+#[allow(dead_code)]
 pub fn sample_index_weighted(weights: &[f32]) -> usize {
     assert!(!weights.is_empty(), "Trying to sample from emptry distribution");
 
@@ -38,7 +40,7 @@ pub fn sample_index_weighted(weights: &[f32]) -> usize {
 
     roll_outs
         .enumerate()
-        .min_by(|(_, r1), (_, r2)| r1.total_cmp(r2))
+        .min_by(|(_, r1), (_, r2)| r1.partial_cmp(r2).unwrap())
         .unwrap()
         .0
 }

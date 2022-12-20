@@ -5,8 +5,8 @@ use std::time::Duration;
 mod agent;
 mod kalah;
 mod kgp;
-mod mcts;
 mod minimax;
+mod minimax_move_ordering;
 mod util;
 
 use agent::Agent;
@@ -14,30 +14,38 @@ pub use kalah::{Board, Move, Player};
 use kgp::{Command, Connection};
 use threadpool::ThreadPool;
 
-fn single_ply(
-    board: &mut Board,
-    playing_agent: &mut impl Agent,
-    opponent_agent: &mut impl Agent,
-    player: Player,
-    print: bool,
-) -> Player {
+static THINKING_TIME: Duration = Duration::from_secs(1);
+
+fn single_ply(board: &mut Board, playing_agent: &mut impl Agent, player: Player, print: bool) -> Player {
     if print {
         println!("{}\n", board);
     }
 
+    match player {
+        Player::White => playing_agent.set_board(board),
+        Player::Black => {
+            let mut board = board.clone();
+            board.flip_board();
+            playing_agent.set_board(&board)
+        }
+    };
+
     let start_time = std::time::Instant::now();
 
-    let mut player_move = playing_agent.get_move();
+    playing_agent.go();
 
-    let end_time = std::time::Instant::now();
+    let mut player_move = playing_agent.get_current_best_move();
 
-    let dur = end_time - start_time;
+    while start_time.elapsed() < THINKING_TIME {
+        player_move = playing_agent.get_current_best_move();
 
-    if print {
-        println!("{} decided to make move {} after {:?}", player, player_move, dur);
+        std::thread::sleep(Duration::from_millis(50));
     }
 
+    playing_agent.stop();
+
     if player == Player::Black {
+        // Black thinks they're White
         player_move = player_move.flip_player();
     }
 
@@ -49,22 +57,11 @@ fn single_ply(
         println!("Invalid move, using {} instead", player_move); */
     }
 
+    let moves_again = board.apply_move(player_move);
+
     if print {
         println!();
     }
-
-    let moves_again = match player {
-        Player::White => {
-            playing_agent.inform_move(player_move);
-            opponent_agent.inform_move(player_move.flip_player());
-            board.apply_move(player_move)
-        }
-        Player::Black => {
-            playing_agent.inform_move(player_move.flip_player());
-            opponent_agent.inform_move(player_move);
-            board.apply_move(player_move)
-        }
-    };
 
     if moves_again {
         player
@@ -84,8 +81,8 @@ fn game_loop(board: Board, white_agent: impl Agent, black_agent: impl Agent, pri
 
     loop {
         current_player = match current_player {
-            White => single_ply(&mut board, &mut white_agent, &mut black_agent, White, print),
-            Black => single_ply(&mut board, &mut black_agent, &mut white_agent, Black, print),
+            White => single_ply(&mut board, &mut white_agent, White, print),
+            Black => single_ply(&mut board, &mut black_agent, Black, print),
         };
 
         if !board.has_legal_move() {
@@ -96,6 +93,7 @@ fn game_loop(board: Board, white_agent: impl Agent, black_agent: impl Agent, pri
     board
 }
 
+#[allow(dead_code)]
 pub fn play_game<WhiteAgent, BlackAgent>(h: u8, s: u16, white_agent: WhiteAgent, black_agent: BlackAgent)
 where
     WhiteAgent: Agent,
@@ -103,7 +101,7 @@ where
 {
     let board = Board::new(h, s);
 
-    let board = game_loop(board, white_agent, black_agent, true);
+    let board = game_loop(board, white_agent, black_agent, false);
 
     println!("\nFinal board:\n\n{}\n", board);
 
@@ -114,6 +112,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub fn test_agents<WhiteAgent, BlackAgent>(
     h: u8,
     s: u16,
@@ -164,6 +163,7 @@ pub fn test_agents<WhiteAgent, BlackAgent>(
     println!("Black wins: {}", black_wins.load(Ordering::Acquire));
 }
 
+#[allow(dead_code)]
 fn kgp_connect(url: &str) {
     let mut conn = Connection::new(url).expect("Failed to connect");
 
@@ -215,18 +215,23 @@ fn kgp_connect(url: &str) {
 }
 
 fn main() {
-    /* let h = 6;
+    let h = 6;
     let s = 4;
 
-    let thinking_duration = Duration::from_secs(1);
-
-    let white_agent = minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::seed_diff_valuation);
+    // let white_agent_builder = || minimax::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
     // let white_agent = agent::MctsAgent::new(h, s, 2);
+    let white_agent = agent::FirstMoveAgent::new(h, s);
 
+    // let black_agent_builder = || minimax_move_ordering::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
     // let black_agent = agent::RandomAgent::new(h, s);
-    let black_agent = minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::store_diff_valuation);
+    // let black_agent = minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::store_diff_valuation);
+    let black_agent = agent::FirstMoveAgent::new(h, s);
 
-    play_game(h, s, white_agent, black_agent); */
+    let start_t = std::time::Instant::now();
+    play_game(h, s, white_agent, black_agent);
+    println!("Time: {:?}", start_t.elapsed());
+
+    // test_agents(h, s, &white_agent_builder, &black_agent_builder, 20);
 
     /* let url = "wss://kalah.kwarc.info/socket";
 
@@ -238,7 +243,7 @@ fn main() {
         }
     }; */
 
-    let url = "wss://kalah.kwarc.info/socket";
+    // let url = "wss://kalah.kwarc.info/socket";
 
-    kgp_connect(url);
+    // kgp_connect(url);
 }

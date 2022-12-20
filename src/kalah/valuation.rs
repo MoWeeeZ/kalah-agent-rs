@@ -88,7 +88,7 @@ pub fn seed_diff_valuation(board: &Board) -> Valuation {
 
 /// # Safety
 ///
-/// - value shall never be f32::NAN, to making it comparable using f32::total_cmp
+/// - value shall never be f32::NAN, to making it comparable using f32::partial_cmp
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Valuation {
     NonTerminal { value: f32 },
@@ -98,9 +98,9 @@ pub enum Valuation {
 }
 
 impl Valuation {
-    pub fn is_terminal(&self) -> bool {
-        !matches!(self, Valuation::NonTerminal { .. })
-    }
+    /* pub fn is_terminal(&self) -> bool {
+        !(matches!(self, Valuation::NonTerminal { .. }))
+    } */
 
     pub fn increase_depth(self) -> Valuation {
         use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
@@ -114,7 +114,7 @@ impl Valuation {
     }
 
     // Valuation as f32: non-terminals give their inner value, WhiteWin becomes inf, BlackWin -inf, Draw 0
-    pub fn as_f32(&self) -> f32 {
+    /* pub fn as_f32(&self) -> f32 {
         use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
 
         match self {
@@ -123,7 +123,7 @@ impl Valuation {
             TerminalBlackWin { .. } => f32::NEG_INFINITY,
             TerminalDraw { .. } => 0.0,
         }
-    }
+    } */
 }
 
 impl Eq for Valuation {}

@@ -22,7 +22,7 @@ impl Agent for MctsAgent {
         self.search.inform_move(move_);
     }
 
-    fn get_move(&mut self) -> Move {
+    fn get_current_best_move(&mut self) -> Move {
         self.search.current_best_move()
     }
 }

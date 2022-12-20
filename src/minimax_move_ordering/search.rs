@@ -1,8 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use rand::{thread_rng, Rng};
-
 use crate::kalah::valuation::{Valuation, ValuationFn};
 use crate::{Board, Move, Player};
 
@@ -145,7 +143,27 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
 
         me.start_t = std::time::Instant::now();
 
-        let legal_moves = board.legal_moves(Player::White);
+        // moves, their_next_moves, boards with move ordering by last iteration; initially no ordering
+        let mut moves_boards_ordered: Vec<(Move, bool, Board, Valuation)> = board
+            .legal_moves(Player::White)
+            .into_iter()
+            .map(|next_move| {
+                let mut next_board = board.clone();
+                let their_next_move = !next_board.apply_move(next_move);
+
+                if their_next_move {
+                    next_board.flip_board();
+                }
+                (
+                    next_move,
+                    their_next_move,
+                    next_board,
+                    Valuation::NonTerminal { value: 0.0 },
+                )
+            })
+            .collect();
+
+        let num_moves = moves_boards_ordered.len();
 
         let mut current_best_value;
 
@@ -155,14 +173,16 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
         }
 
         for max_depth in 0.. {
-            let mut best_value = TerminalBlackWin { plies: 0 };
-            let mut best_move = legal_moves[0];
+            // let mut best_value = TerminalBlackWin { plies: 0 };
+            // let mut best_move = moves_ordered[0];
 
             let mut value;
             let mut alpha = TerminalBlackWin { plies: 0 };
             let beta = TerminalWhiteWin { plies: 0 };
 
-            for current_move in legal_moves.iter() {
+            let mut moves_boards_vals: Vec<(Move, bool, Board, Valuation)> = Vec::with_capacity(num_moves);
+
+            for (next_move, their_next_move, next_board, _last_valuation) in moves_boards_ordered.into_iter() {
                 if !me.search_state.lock().unwrap().search_active {
                     // since max_depth search never completed: max_depth - 1
                     #[cfg(debug_assertions)]
@@ -177,22 +197,15 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
                     return;
                 }
 
-                let mut next_board = board.clone();
-                let their_move = !next_board.apply_move(*current_move);
-
-                if their_move {
-                    next_board.flip_board();
-                }
-
                 value = {
-                    let (their_alpha, their_beta) = match their_move {
+                    let (their_alpha, their_beta) = match their_next_move {
                         true => (-beta, -alpha),
                         false => (alpha, beta),
                     };
 
                     let their_value = me.minimax(&next_board, max_depth, their_alpha, their_beta);
 
-                    match their_move {
+                    match their_next_move {
                         true => -their_value,
                         false => their_value,
                     }
@@ -200,48 +213,52 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
 
                 // replace if value is either better or the same and wins a coin flip
                 // (to make decision non-deterministic in that case)
-                if value > best_value || value == best_value && thread_rng().gen::<bool>() {
-                    best_value = value;
-                    best_move = *current_move;
-
-                    if let Valuation::TerminalWhiteWin { plies: _plies } = best_value {
-                        #[cfg(debug_assertions)]
-                        {
-                            println!("--------------------------------------------");
-                            println!("* Found certain win in {} plies", _plies);
-                            println!("--------------------------------------------\n");
-                        }
-                        // *current_best_move.lock().unwrap() = best_move;
-                        // search_active.store(false, Ordering::Release);
-                        {
-                            let mut search_state = me.search_state.lock().unwrap();
-                            search_state.current_best_move = best_move;
-                            search_state.search_active = false;
-                        }
-                        return;
-                    }
-                }
+                /* if value > best_value || value == best_value && thread_rng().gen::<bool>() {
+                best_value = value;
+                best_move = current_move; */
+                /* } */
 
                 if ALPHA_BETA_PRUNE && value >= alpha {
                     alpha = value;
                 }
+
+                moves_boards_vals.push((next_move, their_next_move, next_board, value));
 
                 // no beta cutoff since beta is always -inf
                 /* if value >= beta {
                     // beta cutoff
                     break;
                 } */
-            }
+            } // for current_move in moves_ordered.into_iter()
+
+            moves_boards_vals.sort_by(|&(_, val1, _, _), &(_, val2, _, _)| val1.cmp(&val2).reverse());
 
             // *current_best_move.lock().unwrap() = best_move;
-            me.search_state.lock().unwrap().current_best_move = best_move;
-            current_best_value = best_value;
+            me.search_state.lock().unwrap().current_best_move = moves_boards_vals.first().unwrap().0;
+            current_best_value = moves_boards_vals.first().unwrap().3;
+
+            moves_boards_ordered = moves_boards_vals;
 
             /* println!(
                 "Depth {}: found best move with value {}\talpha: {}\t{}",
                 max_depth, best_value, alpha, beta
             ); */
 
+            // best move is a certain win for us
+            if let Valuation::TerminalWhiteWin { plies: _plies } = current_best_value {
+                #[cfg(debug_assertions)]
+                {
+                    println!("--------------------------------------------");
+                    println!("* Found certain win in {} plies", _plies);
+                    println!("--------------------------------------------\n");
+                }
+                // *current_best_move.lock().unwrap() = best_move;
+                // search_active.store(false, Ordering::Release);
+                me.search_state.lock().unwrap().search_active = false;
+                return;
+            }
+
+            // best move is a certain loss for us
             if let TerminalBlackWin { plies: _plies } = current_best_value {
                 // don't exit early if we find a certain loss: our opponent might not've :)
                 #[cfg(debug_assertions)]

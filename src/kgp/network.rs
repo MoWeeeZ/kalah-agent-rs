@@ -28,11 +28,22 @@ impl Connection {
         })
     }
 
-    pub fn read(&mut self) -> Result<String, Error> {
-        self.websocket.read_message().map(|msg| msg.into_text().unwrap())
+    fn read(&mut self) -> Result<String, Error> {
+        self.websocket.read_message().map(|msg| {
+            let msg = msg.into_text().unwrap();
+            #[cfg(debug_assertions)]
+            {
+                println!("< {}", msg);
+            }
+            msg
+        })
     }
 
-    pub fn write(&mut self, msg: String) {
+    fn write(&mut self, msg: String) {
+        #[cfg(debug_assertions)]
+        {
+            println!("> {}", msg);
+        }
         self.websocket.write_message(msg.into()).unwrap()
     }
 

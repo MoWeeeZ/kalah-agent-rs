@@ -1,0 +1,51 @@
+Use this file to give us some information on your agent and your team:
+
+Agent
+=====
+
+Idea
+----
+
+We persused the following idea:
+
+  - minimax search
+  - alpha-beta pruning
+  - some implementation details from the example python agent, in particular KGP parsing and game state handling
+
+Implementation
+--------------
+
+Our agent was written as follows:
+
+  WRITEME (obligatory)
+
+CAVEATS
+-------
+
+Note the that there might be complications if:
+
+  - I fucked up (which I probably did) and am unlucky enough to hit that one edge case I didn't consider :)
+
+Team
+====
+
+List all students that participate in our group are:
+
+- Moritz Gmeiner (eg94ifeh)
+
+Checklist
+=========
+
+Consider taking the time to appropriately check these points:
+
+- [X] Our agent runs without raising exceptions.
+      (exceptions? what are those? my agent just crashes when something goes wrong...)
+- [X] Our agent manages to reliably beat a random agent.
+- [ ] Our agent connects to localhost:2671 by default.
+- [X] Your program does not depend on non-free software.
+- [ ] Any additional dependencies have been specified in the
+      Dockerfile and we confirm that it builds.
+- [X] Max Musterman, Lieschen Müller and Hein Janmaat are not part
+      of our team.
+- [X] We will not check this box. (don't tell me what to do)
+- [X] We have read all of the above.

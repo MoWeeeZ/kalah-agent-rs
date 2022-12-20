@@ -1,26 +1,25 @@
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-
 use crate::agent::{Agent, AgentState};
 use crate::{Board, Move, Player};
 
-pub struct RandomAgent {
+/// agent that always picks the first available move
+/// useful for performance tests since, unlike RandomAgent, it's deterministic
+pub struct FirstMoveAgent {
     state: AgentState,
 
     board: Board,
 }
 
-impl RandomAgent {
+impl FirstMoveAgent {
     #[allow(dead_code)]
     pub fn new(h: u8, s: u16) -> Self {
-        RandomAgent {
+        FirstMoveAgent {
             state: AgentState::Waiting,
             board: Board::new(h, s),
         }
     }
 }
 
-impl Agent for RandomAgent {
+impl Agent for FirstMoveAgent {
     fn set_board(&mut self, board: &Board) {
         self.board = board.clone();
     }
@@ -28,7 +27,7 @@ impl Agent for RandomAgent {
     fn get_current_best_move(&mut self) -> Move {
         assert_eq!(self.state, AgentState::Go);
 
-        *self.board.legal_moves(Player::White).choose(&mut thread_rng()).unwrap()
+        *self.board.legal_moves(Player::White).first().unwrap()
     }
 
     fn get_state(&self) -> AgentState {

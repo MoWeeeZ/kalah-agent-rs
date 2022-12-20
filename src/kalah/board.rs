@@ -245,7 +245,7 @@ impl Board {
         self.flipped = !self.flipped
     }
 
-    pub fn apply_move(&mut self, move_: Move) -> bool {
+    /* pub fn apply_move(&mut self, move_: Move) -> bool {
         assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
 
         if move_.player() == Player::Black {
@@ -340,6 +340,112 @@ impl Board {
                 }
             }
         }
+    } */
+
+    /// new implementation of apply_move; should (hopefully) be faster than the other one
+    /// no time to test, but would make sense since it doesn't have to do big loop?
+    /// also much prettier and easier to understand
+    /// UPDATE: after testing, it's NOT faster :\
+    pub fn apply_move(&mut self, move_: Move) -> bool {
+        assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
+
+        if move_.player() == Player::Black {
+            // if the move is by 'Black': flip the board, apply the move as if by White, flip the board again
+            self.flip_board();
+            let ret = self.apply_move(move_.flip_player());
+            self.flip_board();
+            return ret;
+        }
+
+        let h = self.h() as u16;
+
+        let start_house = move_.house() as usize;
+
+        let seeds_in_hand = self.our_houses()[start_house];
+        self.our_houses_mut()[start_house] = 0;
+
+        assert!(seeds_in_hand != 0, "Trying to move out of empty house");
+
+        // number of all houses we distribute seeds to:
+        // h x our houses, 1 x our store, h x their houses
+        let cycle_length = 2 * h + 1;
+
+        // number of complete cycles we make: can add this value to all houses and our store
+        let num_cycles = seeds_in_hand / cycle_length;
+        // number of seeds remaining after complete cycles have been made
+        let mut rem = (seeds_in_hand % cycle_length) as usize;
+
+        if seeds_in_hand > cycle_length {
+            // distribute seeds to all houses and our store evenly
+            for our_house in self.our_houses_mut() {
+                *our_house += num_cycles;
+            }
+
+            self.our_store += num_cycles;
+
+            for their_house in self.their_houses_mut() {
+                *their_house += num_cycles;
+            }
+        }
+
+        // our houses after starting house
+        let iter = self
+            .our_houses_mut()
+            .iter_mut()
+            .skip(start_house + 1) // skip until after starting house
+            .take(rem);
+
+        for our_house in iter {
+            *our_house += 1;
+            rem -= 1;
+        }
+
+        // our store
+        if rem > 0 {
+            self.our_store += 1;
+            rem -= 1;
+        }
+
+        // their houses
+        for their_house in self.their_houses_mut().iter_mut().take(rem) {
+            *their_house += 1;
+            rem -= 1;
+        }
+
+        // our houses until starting house (inclusive)
+        if rem > 0 {
+            for our_house in self.our_houses_mut().iter_mut().take(rem) {
+                *our_house += 1;
+                rem -= 1;
+            }
+        }
+
+        assert_eq!(rem, 0);
+
+        // index of last house:
+        // 0..h : our_houses[i]
+        // h : our_store
+        // (h+1)..(2h+1) : their_house[i - h - 1] (not relevant)
+        let h = h as usize; // only used for indexing from here on, so 'convert' to usize once
+        let last_house_idx = (seeds_in_hand as usize + cycle_length as usize - start_house) % cycle_length as usize;
+
+        // last seed in our house && our house was empty && opposite house if not empty:
+        if last_house_idx < h
+            && self.our_houses()[last_house_idx] == 1
+            && self.their_houses()[h - last_house_idx - 1] > 0
+        {
+            self.our_store += self.their_houses()[h - last_house_idx - 1] + 1;
+            self.our_houses_mut()[last_house_idx] = 0;
+            self.their_houses_mut()[h - last_house_idx - 1] = 0;
+        }
+
+        if !self.has_legal_move() {
+            // if no moves remain: finish the board
+            self.finish_game();
+        }
+
+        // if last seed in our store -> true (bonus move), else -> false
+        last_house_idx == h
     }
 
     pub fn legal_moves(&self, player: Player) -> Vec<Move> {
