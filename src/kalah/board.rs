@@ -245,7 +245,7 @@ impl Board {
         self.flipped = !self.flipped
     }
 
-    /* pub fn apply_move(&mut self, move_: Move) -> bool {
+    pub fn apply_move(&mut self, move_: Move) -> bool {
         assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
 
         if move_.player() == Player::Black {
@@ -340,13 +340,13 @@ impl Board {
                 }
             }
         }
-    } */
+    }
 
     /// new implementation of apply_move; should (hopefully) be faster than the other one
     /// no time to test, but would make sense since it doesn't have to do big loop?
     /// also much prettier and easier to understand
     /// UPDATE: after testing, it's NOT faster :\
-    pub fn apply_move(&mut self, move_: Move) -> bool {
+    /* pub fn apply_move(&mut self, move_: Move) -> bool {
         assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
 
         if move_.player() == Player::Black {
@@ -445,7 +445,7 @@ impl Board {
 
         // if last seed in our store -> true (bonus move), else -> false
         last_house_idx == h
-    }
+    } */
 
     pub fn legal_moves(&self, player: Player) -> Vec<Move> {
         let houses = match player {
