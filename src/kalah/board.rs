@@ -87,6 +87,8 @@ impl Debug for Move {
 // should be 16 bytes in size
 // as we need 9 bytes anyways (for houses and flipped) and the alignment is 8, we can use the remaining 7 padding bytes
 pub struct Board {
+    h: u8,
+
     // houses: Box<[House]>,
     // reduces the size of Board from 24 bytes to 16 bytes
     // we already know the size of the array is 2*h and we can squeeze it in later as an u8
@@ -95,8 +97,6 @@ pub struct Board {
     pub our_store: u16,
     pub their_store: u16,
 
-    h: u8,
-
     flipped: bool,
 }
 
@@ -104,25 +104,29 @@ unsafe impl Send for Board {}
 unsafe impl Sync for Board {}
 
 impl Board {
-    pub fn new(h: u8, s: House) -> Self {
+    pub fn from_parts(h: u8, houses: Vec<House>, our_store: House, their_store: House, flipped: bool) -> Self {
         assert!(h <= 128, "Can't create more than 128 houses");
 
-        let mut houses_vec: Vec<u16> = vec![s; 2 * h as usize];
+        let mut houses_vec: Vec<u16> = houses;
+        assert_eq!(houses_vec.len(), 2 * h as usize);
+        houses_vec.shrink_to_fit();
+        assert_eq!(houses_vec.capacity(), 2 * h as usize);
 
-        assert!(houses_vec.len() == houses_vec.capacity());
-
-        let houses = houses_vec.as_mut_ptr();
+        let houses_ptr = houses_vec.as_mut_ptr();
 
         std::mem::forget(houses_vec);
 
         Board {
-            // houses: vec![s; 2 * h as usize],
-            houses_ptr: houses,
-            our_store: 0,
-            their_store: 0,
             h,
-            flipped: false,
+            houses_ptr,
+            our_store,
+            their_store,
+            flipped,
         }
+    }
+
+    pub fn new(h: u8, s: House) -> Self {
+        Board::from_parts(h, vec![s; 2 * h as usize], 0, 0, false)
     }
 
     pub fn from_kpg(kpg: &str) -> Self {
@@ -135,25 +139,9 @@ impl Board {
         let our_store: u16 = nums.next().unwrap().parse().unwrap();
         let their_store: u16 = nums.next().unwrap().parse().unwrap();
 
-        let mut houses_vec: Vec<u16> = nums.map(|num_s| num_s.parse().unwrap()).collect();
+        let houses_vec: Vec<u16> = nums.map(|num_s| num_s.parse().unwrap()).collect();
 
-        assert_eq!(houses_vec.len(), 2 * h as usize, "{:?}", houses_vec);
-
-        houses_vec.shrink_to_fit();
-
-        assert_eq!(houses_vec.capacity(), 2 * h as usize);
-
-        let houses_ptr = houses_vec.as_mut_ptr();
-
-        std::mem::forget(houses_vec);
-
-        Board {
-            houses_ptr,
-            our_store,
-            their_store,
-            h,
-            flipped: false,
-        }
+        Board::from_parts(h, houses_vec, our_store, their_store, false)
     }
 
     pub fn to_kgp(&self) -> String {

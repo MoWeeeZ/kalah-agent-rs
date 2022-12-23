@@ -13,13 +13,13 @@ pub fn store_diff_valuation(board: &Board) -> Valuation {
     use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
 
     // const EPS: f32 = 1.0 / u16::MAX as f32;
-    const EPS: f32 = 1e-5;
+    // const EPS: f32 = 1e-5;
 
-    let our_store = board.our_store as f32;
-    let their_store = board.their_store as f32;
+    let our_store = board.our_store as i16;
+    let their_store = board.their_store as i16;
 
-    let our_houses_sum = board.our_houses().iter().sum::<u16>() as f32;
-    let their_houses_sum = board.their_houses().iter().sum::<u16>() as f32;
+    // let our_houses_sum = board.our_houses().iter().sum::<u16>() as i16;
+    // let their_houses_sum = board.their_houses().iter().sum::<u16>() as i16;
 
     if !board.has_legal_move() {
         // no move left or more than half the seeds in one players store -> this is a terminal node
@@ -29,20 +29,22 @@ pub fn store_diff_valuation(board: &Board) -> Valuation {
         let score_diff = our_store - their_store;
 
         return match score_diff {
-            val if val > 0.0 => TerminalWhiteWin { plies: 0 },
-            val if val < 0.0 => TerminalBlackWin { plies: 0 },
-            val if val == 0.0 => TerminalDraw { plies: 0 },
-            val => panic!("Value has invalid value {}", val),
+            val if val > 0 => TerminalWhiteWin { plies: 0 },
+            val if val < 0 => TerminalBlackWin { plies: 0 },
+            val if val == 0 => TerminalDraw { plies: 0 },
+            // val => panic!("Value has invalid value {}", val),
+            _ => unreachable!(),
         };
     }
 
-    let total_seeds = our_store + our_houses_sum + their_store + their_houses_sum;
+    // let total_seeds = our_store + our_houses_sum + their_store + their_houses_sum;
 
-    let score = ((1.0 + EPS) * our_store) - ((1.0 + EPS) * their_store);
+    // let score = ((1.0 + EPS) * our_store) - ((1.0 + EPS) * their_store);
+    let score = (our_store - their_store) as i32;
 
     NonTerminal {
-        value: score / total_seeds,
-        // value: score.tanh(),
+        value: score, // / total_seeds,
+                      // value: score.tanh(),
     }
 }
 
@@ -51,13 +53,13 @@ pub fn seed_diff_valuation(board: &Board) -> Valuation {
     use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
 
     // const EPS: f32 = 1.0 / u16::MAX as f32;
-    const EPS: f32 = 1e-5;
+    // const EPS: f32 = 1e-5;S
 
-    let our_store = board.our_store as f32;
-    let their_store = board.their_store as f32;
+    let our_store = board.our_store as i16;
+    let their_store = board.their_store as i16;
 
-    let our_houses_sum = board.our_houses().iter().sum::<u16>() as f32;
-    let their_houses_sum = board.their_houses().iter().sum::<u16>() as f32;
+    let our_houses_sum = board.our_houses().iter().sum::<u16>() as i16;
+    let their_houses_sum = board.their_houses().iter().sum::<u16>() as i16;
 
     if !board.has_legal_move() {
         // no move left or more than half the seeds in one players store -> this is a terminal node
@@ -67,20 +69,28 @@ pub fn seed_diff_valuation(board: &Board) -> Valuation {
         let score_diff = our_store - their_store;
 
         return match score_diff {
-            val if val > 0.0 => TerminalWhiteWin { plies: 0 },
-            val if val < 0.0 => TerminalBlackWin { plies: 0 },
-            val if val == 0.0 => TerminalDraw { plies: 0 },
-            val => panic!("Value has invalid value {}", val),
+            val if val > 0 => TerminalWhiteWin { plies: 0 },
+            val if val < 0 => TerminalBlackWin { plies: 0 },
+            val if val == 0 => TerminalDraw { plies: 0 },
+            // val => panic!("Value has invalid value {}", val),
+            _ => unreachable!(),
         };
     }
 
-    let total_seeds = our_store + our_houses_sum + their_store + their_houses_sum;
+    // let total_seeds = our_store + our_houses_sum + their_store + their_houses_sum;
 
-    let score = ((1.0 + EPS) * our_store + our_houses_sum) - ((1.0 + EPS) * their_store + their_houses_sum);
+    // let score = ((1.0 + EPS) * our_store + our_houses_sum) - ((1.0 + EPS) * their_store + their_houses_sum);
+
+    let seed_diff = our_store + our_houses_sum - their_store - their_houses_sum;
+    let store_diff = our_store - their_store;
+
+    // upper 16 bits: seed difference
+    // lower 16 bits: store difference (as tie breaker), shifted to the positive range
+    let score = ((seed_diff as i32) << 16) + (store_diff as i32 - (i16::MIN as i32));
 
     NonTerminal {
-        value: score / total_seeds,
-        // value: score.tanh(),
+        value: score, // / total_seeds,
+                      // value: score.tanh(),
     }
 }
 
@@ -91,7 +101,7 @@ pub fn seed_diff_valuation(board: &Board) -> Valuation {
 /// - value shall never be f32::NAN, to making it comparable using f32::partial_cmp
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Valuation {
-    NonTerminal { value: f32 },
+    NonTerminal { value: i32 },
     TerminalWhiteWin { plies: u32 },
     TerminalBlackWin { plies: u32 },
     TerminalDraw { plies: u32 },
@@ -145,7 +155,7 @@ impl std::ops::Neg for Valuation {
 }
 
 // divide non-terminal value by divisor, leave ply count as it is; useful for averaging
-impl std::ops::Div<f32> for Valuation {
+/* impl std::ops::Div<f32> for Valuation {
     type Output = Valuation;
 
     fn div(self, rhs: f32) -> Self::Output {
@@ -155,7 +165,7 @@ impl std::ops::Div<f32> for Valuation {
             _ => self,
         }
     }
-}
+} */
 
 impl PartialOrd for Valuation {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -170,26 +180,21 @@ impl Ord for Valuation {
         use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
 
         match (self, other) {
-            // pick Valuation with higher value
-            (NonTerminal { value: val1 }, NonTerminal { value: val2 }) => val1.partial_cmp(val2).unwrap(),
-            (NonTerminal { .. }, TerminalWhiteWin { .. }) => Less,
-            (NonTerminal { .. }, TerminalBlackWin { .. }) => Greater,
-            (NonTerminal { value }, TerminalDraw { .. }) => value.partial_cmp(&0.0).unwrap(),
-            (TerminalWhiteWin { .. }, NonTerminal { .. }) => Greater,
-            // pick Valuation with less steps until win
-            (TerminalWhiteWin { plies: s1 }, TerminalWhiteWin { plies: s2 }) => s1.cmp(s2).reverse(),
-            (TerminalWhiteWin { .. }, TerminalBlackWin { .. }) => Greater,
-            (TerminalWhiteWin { .. }, TerminalDraw { .. }) => Greater,
-            (TerminalBlackWin { .. }, NonTerminal { .. }) => Less,
-            (TerminalBlackWin { .. }, TerminalWhiteWin { .. }) => Less,
-            // pick Valuation with more steps until loss: opponent might make mistake and lose certain win
-            (TerminalBlackWin { plies: s1 }, TerminalBlackWin { plies: s2 }) => s1.cmp(s2),
-            (TerminalBlackWin { .. }, TerminalDraw { .. }) => Less,
-            (TerminalDraw { .. }, NonTerminal { value }) => (0.0).partial_cmp(value).unwrap(),
-            (TerminalDraw { .. }, TerminalWhiteWin { .. }) => Less,
-            (TerminalDraw { .. }, TerminalBlackWin { .. }) => Greater,
-            // pick Valuation with more steps until draw: opponent might make mistake and lose certain draw
-            (TerminalDraw { plies: s1 }, TerminalDraw { plies: s2 }) => s1.cmp(s2).reverse(),
+            // TerminalWhiteWin can only be beaten by TerminalWhiteWin with less plies
+            (TerminalWhiteWin { plies: p1 }, TerminalWhiteWin { plies: p2 }) => p1.cmp(p2).reverse(),
+            (TerminalWhiteWin { .. }, _) => Greater,
+            (_, TerminalWhiteWin { .. }) => Less,
+
+            // NonTerminal and TerminalDraw get compared by value (draws count as 0 value)
+            (NonTerminal { value: v1 }, NonTerminal { value: v2 }) => v1.cmp(v2),
+            (NonTerminal { value }, TerminalDraw { .. }) => value.cmp(&0),
+            (TerminalDraw { .. }, NonTerminal { value }) => 0.cmp(value),
+            (TerminalDraw { plies: p1 }, TerminalDraw { plies: p2 }) => p1.cmp(p2).reverse(),
+
+            // TerminalBlackWin can only beat a TerminalBlackWin with less plies
+            (TerminalBlackWin { plies: p1 }, TerminalBlackWin { plies: p2 }) => p1.cmp(p2),
+            (TerminalBlackWin { .. }, _) => Less,
+            (_, TerminalBlackWin { .. }) => Greater,
         }
     }
 }

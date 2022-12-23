@@ -7,6 +7,7 @@ mod kalah;
 mod kgp;
 mod minimax;
 mod minimax_move_ordering;
+mod minimax_weak_mo;
 mod util;
 
 use agent::Agent;
@@ -52,7 +53,10 @@ fn single_ply(board: &mut Board, playing_agent: &mut impl Agent, player: Player,
     let valid_moves = board.legal_moves(player);
 
     if !valid_moves.iter().any(|valid_move| *valid_move == player_move) {
-        panic!("Invalid move {} in position \n{}\n\n", player_move, board);
+        panic!(
+            "Invalid move {} by Player {} in position \n{}\n\n",
+            player_move, player, board
+        );
         /* player_move = *valid_moves.choose(&mut thread_rng()).unwrap();
         println!("Invalid move, using {} instead", player_move); */
     }
@@ -123,7 +127,9 @@ pub fn test_agents<WhiteAgent, BlackAgent>(
     WhiteAgent: Agent + Send + 'static,
     BlackAgent: Agent + Send + 'static,
 {
-    let num_workers = 8;
+    let num_workers = num_cpus::get() / 2;
+
+    println!("Running with {} workers", num_workers);
 
     let white_wins = Arc::new(AtomicU64::new(0));
     let black_wins = Arc::new(AtomicU64::new(0));
@@ -218,20 +224,17 @@ fn main() {
     let h = 6;
     let s = 4;
 
-    // let white_agent_builder = || minimax::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
+    let white_agent = minimax::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
     // let white_agent = agent::MctsAgent::new(h, s, 2);
-    let white_agent = agent::FirstMoveAgent::new(h, s);
+    // let white_agent = agent::FirstMoveAgent::new(h, s);
 
-    // let black_agent_builder = || minimax_move_ordering::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
+    let black_agent = minimax_weak_mo::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
     // let black_agent = agent::RandomAgent::new(h, s);
     // let black_agent = minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::store_diff_valuation);
-    let black_agent = agent::FirstMoveAgent::new(h, s);
+    // let black_agent = agent::FirstMoveAgent::new(h, s);
 
-    let start_t = std::time::Instant::now();
     play_game(h, s, white_agent, black_agent);
-    println!("Time: {:?}", start_t.elapsed());
-
-    // test_agents(h, s, &white_agent_builder, &black_agent_builder, 20);
+    // test_agents(h, s, white_agent, black_agent, 30);
 
     /* let url = "wss://kalah.kwarc.info/socket";
 
