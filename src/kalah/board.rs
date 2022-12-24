@@ -262,107 +262,6 @@ impl Board {
             return ret;
         }
 
-        let h = self.h() as usize;
-
-        let start_house = move_.house() as usize;
-
-        let mut seeds_in_hand = self.our_houses()[start_house];
-        self.our_houses_mut()[start_house] = 0;
-
-        assert!(seeds_in_hand != 0, "Trying to move out of empty house");
-
-        for i in (start_house + 1)..h {
-            self.our_houses_mut()[i] += 1;
-            seeds_in_hand -= 1;
-
-            if seeds_in_hand == 0 {
-                // if our house was empty and their opposing house is not
-                if self.our_houses()[i] == 1 && self.their_houses_mut()[h - i] != 0 {
-                    // move seed from our house and all seeds from their house to our store
-                    self.our_store += 1 + self.their_houses()[h - i - 1];
-
-                    self.our_houses_mut()[i] = 0;
-                    self.their_houses_mut()[h - i - 1] = 0;
-                }
-
-                if !self.has_legal_move() {
-                    self.finish_game();
-                }
-
-                return false;
-            }
-        }
-
-        loop {
-            // distribute seed to our store
-            // seeds_in_hand will never be zero since it's checked for before
-            self.our_store += 1;
-            seeds_in_hand -= 1;
-
-            if seeds_in_hand == 0 {
-                if !self.has_legal_move() {
-                    self.finish_game();
-                }
-
-                return true;
-            }
-
-            // distribute seeds to their houses
-            for j in 0..h {
-                self.their_houses_mut()[j] += 1;
-                seeds_in_hand -= 1;
-
-                if seeds_in_hand == 0 {
-                    if !self.has_legal_move() {
-                        self.finish_game();
-                    }
-
-                    return false;
-                }
-            }
-
-            // don't distribute seeds to their store
-
-            // distribute seeds to our houses
-            for i in 0..h {
-                self.our_houses_mut()[i] += 1;
-                seeds_in_hand -= 1;
-
-                if seeds_in_hand == 0 {
-                    // if our house was empty and their opposing house is not
-                    if self.our_houses()[i] == 1 && self.their_houses_mut()[h - i - 1] != 0 {
-                        // move seed from our house and all seeds from their house to our store
-                        self.our_store += 1 + self.their_houses()[h - i - 1];
-
-                        self.our_houses_mut()[i] = 0;
-                        self.their_houses_mut()[h - i - 1] = 0;
-                    }
-
-                    if !self.has_legal_move() {
-                        self.finish_game();
-                    }
-
-                    return false;
-                }
-            }
-        }
-    }
-
-    /// new implementation of apply_move; should (hopefully) be faster than the other one
-    /// no time to test, but would make sense since it doesn't have to do big loop?
-    /// also much prettier and easier to understand
-    /// UPDATE: after testing, it's NOT faster :\
-    /* pub fn apply_move(&mut self, move_: Move) -> bool {
-        assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
-
-        if move_.player() == Player::Black {
-            // if the move is by 'Black': flip the board, apply the move as if by White, flip the board again
-            self.flip_board();
-            let ret = self.apply_move(move_.flip_player());
-            self.flip_board();
-            return ret;
-        }
-
         let h = self.h() as u16;
 
         let start_house = move_.house() as usize;
@@ -451,7 +350,7 @@ impl Board {
 
         // if last seed in our store -> true (bonus move), else -> false
         last_house_idx == h
-    } */
+    }
 
     pub fn legal_moves(&self, player: Player) -> Vec<Move> {
         let houses = match player {
