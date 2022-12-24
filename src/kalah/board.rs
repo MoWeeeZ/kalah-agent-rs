@@ -84,15 +84,12 @@ impl Debug for Move {
 
 /*====================================================================================================================*/
 
-// should be 16 bytes in size
-// as we need 9 bytes anyways (for houses and flipped) and the alignment is 8, we can use the remaining 7 padding bytes
+// should be 24 bytes in size
 pub struct Board {
     h: u8,
 
-    // houses: Box<[House]>,
-    // reduces the size of Board from 24 bytes to 16 bytes
-    // we already know the size of the array is 2*h and we can squeeze it in later as an u8
-    houses_ptr: *mut House,
+    our_houses_ptr: *mut House,
+    their_houses_ptr: *mut House,
 
     pub our_store: u16,
     pub their_store: u16,
@@ -104,21 +101,37 @@ unsafe impl Send for Board {}
 unsafe impl Sync for Board {}
 
 impl Board {
-    pub fn from_parts(h: u8, houses: Vec<House>, our_store: House, their_store: House, flipped: bool) -> Self {
+    pub fn from_parts(
+        h: u8,
+        our_houses: Vec<House>,
+        their_houses: Vec<House>,
+        our_store: House,
+        their_store: House,
+        flipped: bool,
+    ) -> Self {
         assert!(h <= 128, "Can't create more than 128 houses");
 
-        let mut houses_vec: Vec<u16> = houses;
-        assert_eq!(houses_vec.len(), 2 * h as usize);
-        houses_vec.shrink_to_fit();
+        assert_eq!(our_houses.len(), h as usize);
+        assert_eq!(their_houses.len(), h as usize);
+
+        let mut houses_vec: Vec<u16> = Vec::with_capacity(2 * h as usize);
         assert_eq!(houses_vec.capacity(), 2 * h as usize);
 
-        let houses_ptr = houses_vec.as_mut_ptr();
+        houses_vec.extend_from_slice(&our_houses);
+        houses_vec.extend_from_slice(&their_houses);
 
+        assert_eq!(houses_vec.len(), 2 * h as usize);
+
+        let houses_ptr = houses_vec.as_mut_ptr();
         std::mem::forget(houses_vec);
+
+        let our_houses_ptr = houses_ptr;
+        let their_houses_ptr = unsafe { houses_ptr.add(h as usize) };
 
         Board {
             h,
-            houses_ptr,
+            our_houses_ptr,
+            their_houses_ptr,
             our_store,
             their_store,
             flipped,
@@ -126,7 +139,7 @@ impl Board {
     }
 
     pub fn new(h: u8, s: House) -> Self {
-        Board::from_parts(h, vec![s; 2 * h as usize], 0, 0, false)
+        Board::from_parts(h, vec![s; h as usize], vec![s; h as usize], 0, 0, false)
     }
 
     pub fn from_kpg(kpg: &str) -> Self {
@@ -139,9 +152,20 @@ impl Board {
         let our_store: u16 = nums.next().unwrap().parse().unwrap();
         let their_store: u16 = nums.next().unwrap().parse().unwrap();
 
-        let houses_vec: Vec<u16> = nums.map(|num_s| num_s.parse().unwrap()).collect();
+        // let houses_vec: Vec<u16> = nums.map(|num_s| num_s.parse().unwrap()).collect();
+        let mut our_houses_vec: Vec<House> = Vec::with_capacity(h as usize);
+        for _ in 0..h {
+            our_houses_vec.push(nums.next().unwrap().parse().unwrap());
+        }
 
-        Board::from_parts(h, houses_vec, our_store, their_store, false)
+        let mut their_houses_vec: Vec<House> = Vec::with_capacity(h as usize);
+        for _ in 0..h {
+            their_houses_vec.push(nums.next().unwrap().parse().unwrap());
+        }
+
+        assert_eq!(nums.count(), 0);
+
+        Board::from_parts(h, our_houses_vec, their_houses_vec, our_store, their_store, false)
     }
 
     pub fn to_kgp(&self) -> String {
@@ -194,25 +218,25 @@ impl Board {
     pub fn our_houses(&self) -> &[House] {
         // let h = self.h() as usize;
         // &self.houses[..h]
-        unsafe { std::slice::from_raw_parts(self.houses_ptr, self.h as usize) }
+        unsafe { std::slice::from_raw_parts(self.our_houses_ptr, self.h as usize) }
     }
 
     pub fn our_houses_mut(&mut self) -> &mut [House] {
         // let h = self.h() as usize;
         // &mut self.houses[..h]
-        unsafe { std::slice::from_raw_parts_mut(self.houses_ptr, self.h as usize) }
+        unsafe { std::slice::from_raw_parts_mut(self.our_houses_ptr, self.h as usize) }
     }
 
     pub fn their_houses(&self) -> &[House] {
         // let h = self.h() as usize;
         // &self.houses[h..]
-        unsafe { std::slice::from_raw_parts(self.houses_ptr.add(self.h as usize), self.h as usize) }
+        unsafe { std::slice::from_raw_parts(self.their_houses_ptr, self.h as usize) }
     }
 
     pub fn their_houses_mut(&mut self) -> &mut [House] {
         // let h = self.h() as usize;
         // &mut self.houses[h..]
-        unsafe { std::slice::from_raw_parts_mut(self.houses_ptr.add(self.h as usize), self.h as usize) }
+        unsafe { std::slice::from_raw_parts_mut(self.their_houses_ptr, self.h as usize) }
     }
 
     pub fn flipped(&self) -> bool {
@@ -220,13 +244,7 @@ impl Board {
     }
 
     pub fn flip_board(&mut self) {
-        let h = self.h() as usize;
-
-        unsafe {
-            for i in 0..h {
-                std::ptr::swap(self.houses_ptr.add(i), self.houses_ptr.add(h + i));
-            }
-        }
+        std::mem::swap(&mut self.our_houses_ptr, &mut self.their_houses_ptr);
 
         std::mem::swap(&mut self.our_store, &mut self.their_store);
 
@@ -488,7 +506,7 @@ impl Debug for Board {
 
 impl Clone for Board {
     fn clone(&self) -> Self {
-        // recreate houses Vec
+        /* // recreate houses Vec
         let houses = unsafe { Vec::from_raw_parts(self.houses_ptr, 2 * self.h as usize, 2 * self.h as usize) };
 
         // clone houses Vec and get pointer to its buffer
@@ -498,10 +516,23 @@ impl Clone for Board {
 
         // forget houses and houses_clone Vecs
         std::mem::forget(houses);
-        std::mem::forget(houses_clone);
+        std::mem::forget(houses_clone); */
+
+        let h = self.h as usize;
+
+        let mut houses_vec: Vec<House> = Vec::with_capacity(2 * h);
+        let our_houses_ptr = houses_vec.as_mut_ptr();
+        let their_houses_ptr = unsafe { our_houses_ptr.add(h) };
+        std::mem::forget(houses_vec);
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(self.our_houses_ptr, our_houses_ptr, h);
+            std::ptr::copy_nonoverlapping(self.their_houses_ptr, their_houses_ptr, h);
+        }
 
         Self {
-            houses_ptr: houses_clone_ptr,
+            our_houses_ptr,
+            their_houses_ptr,
             our_store: self.our_store,
             their_store: self.their_store,
             h: self.h,
@@ -513,8 +544,16 @@ impl Clone for Board {
 impl Drop for Board {
     fn drop(&mut self) {
         // recreate houses Vec and drop it
-        let houses_vec = unsafe { Vec::from_raw_parts(self.houses_ptr, 2 * self.h as usize, 2 * self.h as usize) };
-        drop(houses_vec);
+        unsafe {
+            // beginning of the buffer is the lower of the two addresses
+            let houses_ptr = if self.our_houses_ptr < self.their_houses_ptr {
+                self.our_houses_ptr
+            } else {
+                self.their_houses_ptr
+            };
+            let houses_vec = Vec::from_raw_parts(houses_ptr, 2 * self.h as usize, 2 * self.h as usize);
+            drop(houses_vec);
+        }
     }
 }
 

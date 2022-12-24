@@ -225,12 +225,10 @@ fn main() {
     let s = 4;
 
     let white_agent = minimax::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
-    // let white_agent = agent::MctsAgent::new(h, s, 2);
     // let white_agent = agent::FirstMoveAgent::new(h, s);
 
     let black_agent = minimax_weak_mo::MinimaxAgent::<true>::new(h, s, kalah::valuation::seed_diff_valuation);
     // let black_agent = agent::RandomAgent::new(h, s);
-    // let black_agent = minimax::MinimaxAgent::new(h, s, thinking_duration, true, kalah::valuation::store_diff_valuation);
     // let black_agent = agent::FirstMoveAgent::new(h, s);
 
     play_game(h, s, white_agent, black_agent);
