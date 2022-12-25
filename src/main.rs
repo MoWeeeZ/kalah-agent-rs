@@ -7,7 +7,6 @@ mod agent;
 mod kalah;
 mod kgp;
 mod minimax;
-mod minimax2;
 mod util;
 
 use agent::{Agent, AgentState};
@@ -136,8 +135,8 @@ pub fn test_agents<Agent1, Agent2>(
 
     println!("Running with {} workers", num_workers);
 
-    let white_wins = Arc::new(AtomicU64::new(0));
-    let black_wins = Arc::new(AtomicU64::new(0));
+    let agent1_wins = Arc::new(AtomicU64::new(0));
+    let agent2_wins = Arc::new(AtomicU64::new(0));
     let draws = Arc::new(AtomicU64::new(0));
 
     let pool = ThreadPool::new(num_workers);
@@ -153,21 +152,27 @@ pub fn test_agents<Agent1, Agent2>(
             let agent1 = agent1_builder();
             let agent2 = agent2_builder();
 
-            let white_wins = Arc::clone(&white_wins);
-            let black_wins = Arc::clone(&black_wins);
+            let agent1_wins = Arc::clone(&agent1_wins);
+            let agent2_wins = Arc::clone(&agent2_wins);
             let draws = Arc::clone(&draws);
 
             move || {
-                let board = if i % 2 == 0 {
-                    game_loop(board, agent1, agent2, false)
-                } else {
-                    game_loop(board, agent2, agent1, false)
-                };
+                if i % 2 == 0 {
+                    let board = game_loop(board, agent1, agent2, false);
 
-                match board.our_store.cmp(&board.their_store) {
-                    std::cmp::Ordering::Less => black_wins.fetch_add(1, Ordering::Release),
-                    std::cmp::Ordering::Equal => draws.fetch_add(1, Ordering::Release),
-                    std::cmp::Ordering::Greater => white_wins.fetch_add(1, Ordering::Release),
+                    match board.our_store.cmp(&board.their_store) {
+                        std::cmp::Ordering::Less => agent2_wins.fetch_add(1, Ordering::Release),
+                        std::cmp::Ordering::Equal => draws.fetch_add(1, Ordering::Release),
+                        std::cmp::Ordering::Greater => agent1_wins.fetch_add(1, Ordering::Release),
+                    };
+                } else {
+                    let board = game_loop(board, agent2, agent1, false);
+
+                    match board.our_store.cmp(&board.their_store) {
+                        std::cmp::Ordering::Less => agent1_wins.fetch_add(1, Ordering::Release),
+                        std::cmp::Ordering::Equal => draws.fetch_add(1, Ordering::Release),
+                        std::cmp::Ordering::Greater => agent2_wins.fetch_add(1, Ordering::Release),
+                    };
                 };
             }
         });
@@ -200,9 +205,9 @@ pub fn test_agents<Agent1, Agent2>(
 
     pool.join();
 
-    println!("White wins: {}", white_wins.load(Ordering::Acquire));
-    println!("Draws:      {}", draws.load(Ordering::Acquire));
-    println!("Black wins: {}", black_wins.load(Ordering::Acquire));
+    println!("Agent 1 wins: {}", agent1_wins.load(Ordering::Acquire));
+    println!("Draws:        {}", draws.load(Ordering::Acquire));
+    println!("Agent 2 wins: {}", agent2_wins.load(Ordering::Acquire));
 }
 
 fn process_command(conn: &mut Connection, active_agents: &mut HashMap<u32, (Box<dyn Agent>, Option<Move>)>) {
@@ -247,7 +252,7 @@ fn process_command(conn: &mut Connection, active_agents: &mut HashMap<u32, (Box<
         Command::State { id, ref_id, board } => {
             let id = id.expect("Server didn't attach id to state");
 
-            if id > 10 && board.our_store < 2 && board.their_store < 2 {
+            if id > 50 && board.our_store < 5 && board.their_store < 5 {
                 // server trying to start second game
                 std::process::exit(0);
             }
@@ -339,29 +344,30 @@ fn kgp_connect(url: &Url) {
 }
 
 fn main() {
-    let h = 8;
-    let s = 8;
+    /* let h = 8;
+    let s = 8; */
 
     /* // let white_agent = agent::RandomAgent::new(h, s);
     let white_agent = minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::seed_diff_valuation);
     // let white_agent = agent::FirstMoveAgent::new(h, s);
 
-    let black_agent = minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::seed_diff_valuation);
+    let black_agent = agent::RandomAgent::new(h, s);
+    // let black_agent = minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
     // let black_agent = agent::FirstMoveAgent::new(h, s);
 
     // let start_t = std::time::Instant::now();
     play_game(h, s, white_agent, black_agent);
     // println!("{:?}", start_t.elapsed()); */
 
-    let white_agent_builder = &|| minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::seed_diff_valuation);
+    /* let white_agent_builder = &|| minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::seed_diff_valuation);
 
     // let black_agent_builder = &|| agent::RandomAgent::new(h, s);
-    let black_agent_builder = &|| minimax2::MinimaxAgent::new(Board::new(h, s), kalah::valuation::seed_diff_valuation);
+    let black_agent_builder = &|| minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::seed_diff_valuation);
 
-    test_agents(h, s, white_agent_builder, black_agent_builder, 4 * 8);
+    test_agents(h, s, white_agent_builder, black_agent_builder, 4 * 8); */
 
-    /* let url: Url = "wss://kalah.kwarc.info/socket".parse().unwrap();
+    let url: Url = "wss://kalah.kwarc.info/socket".parse().unwrap();
     // url.set_port(Some(2671)).unwrap();
 
-    kgp_connect(&url); */
+    kgp_connect(&url);
 }
