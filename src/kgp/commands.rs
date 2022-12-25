@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::str::FromStr;
 
 use lazy_static::lazy_static;
@@ -30,10 +31,12 @@ pub enum Command {
     Ping {
         id: Option<u32>,
         ref_id: Option<u32>,
+        msg: String,
     },
     Pong {
         id: Option<u32>,
         ref_id: Option<u32>,
+        msg: String,
     },
     Goodbye {
         id: Option<u32>,
@@ -99,12 +102,12 @@ impl FromStr for Command {
             .map(|cap: regex::Match| cap.as_str())
             .unwrap_or("");
 
-        let args_vec: Vec<&str> = args.split_ascii_whitespace().collect();
-
         match cmd {
             "kgp" => {
+                let args_vec: Vec<&str> = args.split_ascii_whitespace().collect();
+
                 if args_vec.len() != 3 {
-                    return Err(format!("Could not parse kgp arguments \"{}\"", args));
+                    return Err(format!("Unexpected args for kpg command: \"{}\"", args));
                 }
 
                 let major: u8 = args_vec[0]
@@ -126,6 +129,12 @@ impl FromStr for Command {
                 })
             }
             "state" => {
+                let args_vec: Vec<&str> = args.split_ascii_whitespace().collect();
+
+                if args_vec.len() != 1 {
+                    return Err(format!("Unexpected args for state command: \"{}\"", args));
+                }
+
                 let board = Board::from_kpg(args_vec[0]);
 
                 Ok(Command::State {
@@ -136,15 +145,108 @@ impl FromStr for Command {
             }
             "stop" => Ok(Command::Stop { id, ref_id: id_ref }),
             "ok" => Ok(Command::Ok { id, ref_id: id_ref }),
-            "ping" => Ok(Command::Ping { id, ref_id: id_ref }),
-            "pong" => Ok(Command::Pong { id, ref_id: id_ref }),
+            "ping" => Ok(Command::Ping {
+                id,
+                ref_id: id_ref,
+                msg: args.to_owned(),
+            }),
+            "pong" => Ok(Command::Pong {
+                id,
+                ref_id: id_ref,
+                msg: args.to_owned(),
+            }),
             "goodbye" => Ok(Command::Goodbye { id, ref_id: id_ref }),
             "error" => Ok(Command::Error {
                 id,
                 ref_id: id_ref,
-                msg: args_vec[0].to_owned(),
+                msg: args.to_owned(),
             }),
             _ => Err(format!("Unknown command {}", cmd)),
+        }
+    }
+}
+
+impl Display for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Command::Kpg {
+                id,
+                ref_id,
+                major,
+                minor,
+                patch,
+            } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " kpg {} {} {}", major, minor, patch)
+            }
+            Command::State { id, ref_id, board } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " state {}", board.to_kgp())
+            }
+            Command::Stop { id, ref_id } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " stop")
+            }
+            Command::Ok { id, ref_id } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " ok")
+            }
+            Command::Ping { id, ref_id, msg } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " ping {}", msg)
+            }
+            Command::Pong { id, ref_id, msg } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " pong {}", msg)
+            }
+            Command::Goodbye { id, ref_id } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " goodbye")
+            }
+            Command::Error { id, ref_id, msg } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " error {}", msg)
+            }
         }
     }
 }

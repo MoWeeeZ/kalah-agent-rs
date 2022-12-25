@@ -1,7 +1,6 @@
 use std::fmt::{Debug, Display};
 
-type House = u16;
-type HouseNum = u8;
+pub type House = u16;
 
 /*====================================================================================================================*/
 
@@ -42,7 +41,7 @@ pub struct Move {
 }
 
 impl Move {
-    pub fn new(house_num: HouseNum, player: Player) -> Self {
+    pub fn new(house_num: u8, player: Player) -> Self {
         assert!(house_num < 128, "House needs to be smaller than 128");
 
         let mut data = house_num;
@@ -53,7 +52,7 @@ impl Move {
         Move { data }
     }
 
-    pub fn house(&self) -> HouseNum {
+    pub fn house(&self) -> u8 {
         self.data & 0b0111_1111
     }
 
@@ -177,11 +176,11 @@ impl Board {
             false => {
                 write!(s, "<{}, {}, {}", self.h(), self.our_store, self.their_store).unwrap();
 
-                for seeds in self.our_houses() {
-                    write!(s, ", {}", seeds).unwrap();
+                for seed in self.our_houses() {
+                    write!(s, ", {}", seed).unwrap();
                 }
-                for seeds in self.their_houses() {
-                    write!(s, ", {}", seeds).unwrap();
+                for seed in self.their_houses().iter().rev() {
+                    write!(s, ", {}", seed).unwrap();
                 }
 
                 write!(s, ">").unwrap();
@@ -189,11 +188,11 @@ impl Board {
             true => {
                 write!(s, "<{}, {}, {}", self.h(), self.their_store, self.our_store).unwrap();
 
-                for seeds in self.their_houses() {
-                    write!(s, ", {}", seeds).unwrap();
+                for seed in self.their_houses() {
+                    write!(s, ", {}", seed).unwrap();
                 }
-                for seeds in self.our_houses() {
-                    write!(s, ", {}", seeds).unwrap();
+                for seed in self.our_houses() {
+                    write!(s, ", {}", seed).unwrap();
                 }
 
                 write!(s, ">").unwrap();

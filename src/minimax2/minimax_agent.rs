@@ -6,7 +6,7 @@ use crate::{Board, Move, Player};
 use super::search::{minimax_search, new_shared_minimax_search_state, SharedMinimaxSearchState};
 use crate::agent::{Agent, AgentState};
 
-pub struct MinimaxAgent<const ALPHA_BETA_PRUNE: bool> {
+pub struct MinimaxAgent {
     state: AgentState,
 
     board: Board,
@@ -16,20 +16,20 @@ pub struct MinimaxAgent<const ALPHA_BETA_PRUNE: bool> {
     valuation_fn: ValuationFn,
 }
 
-impl<const ALPHA_BETA_PRUNE: bool> MinimaxAgent<ALPHA_BETA_PRUNE> {
+impl MinimaxAgent {
     #[allow(dead_code)]
-    pub fn new(h: u8, s: u16, valuation_fn: ValuationFn) -> Self {
+    pub fn new(board: Board, valuation_fn: ValuationFn) -> Self {
         MinimaxAgent {
             state: AgentState::Waiting,
-            board: Board::new(h, s),
+            board,
             search_state: None,
             valuation_fn,
         }
     }
 }
 
-impl<const ALPHA_BETA_PRUNE: bool> Agent for MinimaxAgent<ALPHA_BETA_PRUNE> {
-    fn set_board(&mut self, board: &Board) {
+impl Agent for MinimaxAgent {
+    fn update_board(&mut self, board: &Board) {
         self.board = board.clone();
     }
 
@@ -49,13 +49,18 @@ impl<const ALPHA_BETA_PRUNE: bool> Agent for MinimaxAgent<ALPHA_BETA_PRUNE> {
         let fallback_move = *self.board.legal_moves(Player::White).first().unwrap();
         let search_state = new_shared_minimax_search_state(true, fallback_move);
 
-        minimax_search::<ALPHA_BETA_PRUNE>(&self.board, self.valuation_fn, Arc::clone(&search_state));
+        minimax_search(&self.board, self.valuation_fn, Arc::clone(&search_state));
 
         self.state = AgentState::Go;
         self.search_state = Some(search_state);
     }
 
     fn stop(&mut self) {
+        /* let mut next_board = self.board.clone();
+        next_board.apply_move(self.get_current_best_move());
+
+        println!("Next board:\n{}\n\n", next_board); */
+
         self.state = AgentState::Waiting;
 
         // set search_active to false, then drop reference

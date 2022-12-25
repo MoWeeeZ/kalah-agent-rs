@@ -6,6 +6,8 @@ use rand::{thread_rng, Rng};
 use crate::kalah::valuation::{Valuation, ValuationFn};
 use crate::{Board, Move, Player};
 
+const LOG_STATS: bool = false;
+
 /*====================================================================================================================*/
 
 pub type SharedMinimaxSearchState = Arc<Mutex<MinimaxSearchState>>;
@@ -25,7 +27,7 @@ pub fn new_shared_minimax_search_state(search_active: bool, fallback_move: Move)
 
 /*====================================================================================================================*/
 
-struct MinimaxWorker<const ALPHA_BETA_PRUNE: bool> {
+struct MinimaxWorker {
     search_state: Arc<Mutex<MinimaxSearchState>>,
 
     valuation_fn: ValuationFn,
@@ -35,7 +37,7 @@ struct MinimaxWorker<const ALPHA_BETA_PRUNE: bool> {
     start_t: Instant,
 }
 
-impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
+impl MinimaxWorker {
     pub fn new(valuation_fn: ValuationFn, search_state: SharedMinimaxSearchState) -> Self {
         MinimaxWorker {
             search_state,
@@ -45,13 +47,17 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
         }
     }
 
-    // #[cfg(debug_assertions)]
+    #[allow(dead_code)]
     fn current_nps(&self) -> f64 {
         self.total_nodes_visited as f64 / self.start_t.elapsed().as_secs_f64()
     }
 
-    fn minimax(&mut self, board: &Board, remaining_depth: u32, alpha: Valuation, beta: Valuation) -> Valuation {
-        use std::cmp::Ordering::{Equal, Greater, Less};
+    fn minimax(
+        &mut self,
+        board: &Board,
+        remaining_depth: u32, /* , alpha: Valuation, beta: Valuation */
+    ) -> Valuation {
+        // use std::cmp::Ordering::{Equal, Greater, Less};
 
         self.total_nodes_visited += 1;
 
@@ -64,43 +70,23 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
 
         // immediate win for Black
         let mut best_value = Valuation::TerminalBlackWin { plies: 0 };
-        let mut alpha = alpha;
+        /* let mut alpha = alpha; */
 
-        let mut child_states: Vec<(Board, bool)> = legal_moves
-            .iter()
-            .map(|legal_move| {
-                let mut next_board = board.clone();
-                let their_next_move = !next_board.apply_move(*legal_move);
+        for next_move in legal_moves {
+            let mut next_board = board.clone();
+            let their_next_move = !next_board.apply_move(next_move);
 
+            // run minimax on child; if neccessary, shuffle and negate value, alpha, and beta from their perspective to ours
+            let value = {
                 if their_next_move {
                     next_board.flip_board();
                 }
 
-                (next_board, their_next_move)
-            })
-            .collect();
-
-        // move ordering: search bonus moves first
-        child_states.sort_by(|&(_, tnm1), &(_, tnm2)| match (tnm1, tnm2) {
-            (true, false) => Less,
-            (false, true) => Greater,
-            _ => Equal,
-        });
-
-        for (next_board, their_next_move) in child_states {
-            /* let mut next_board = board.clone();
-            let their_next_move = !next_board.apply_move(legal_move);
-
-            if their_next_move {
-                next_board.flip_board();
-            } */
-
-            // run minimax on child; if neccessary, shuffle and negate value, alpha, and beta from their perspective to ours
-            let value = {
-                let (their_alpha, their_beta) = match their_next_move {
-                    true => (-beta, -alpha),
-                    false => (alpha, beta),
-                };
+                /* let (their_alpha, their_beta) = if their_next_move {
+                    (-beta, -alpha)
+                } else {
+                    (alpha, beta)
+                }; */
 
                 // if next move is by opponent: decrease remaining_depth
                 // if it's a bonus move, don't decrease to keep the game tree balanced
@@ -110,29 +96,36 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
                     remaining_depth
                 };
 
-                let their_value = self.minimax(&next_board, next_remaining_depth, their_alpha, their_beta);
+                let their_value = self.minimax(&next_board, next_remaining_depth /* , their_alpha, their_beta */);
 
-                match their_next_move {
-                    true => -their_value.increase_depth(),
-                    false => their_value.increase_depth(),
+                if their_next_move {
+                    -their_value.increase_plies()
+                } else {
+                    their_value.increase_plies()
                 }
             };
+
+            /* let value = if their_next_move {
+                next_board.flip_board();
+                -self.minimax(&next_board, remaining_depth - 1, -beta, -alpha)
+            } else {
+                self.minimax(&next_board, remaining_depth, alpha, beta)
+            }
+            .increase_depth(); */
 
             if value > best_value {
                 best_value = value;
             }
 
-            if ALPHA_BETA_PRUNE {
-                // value either has higher value or both are terminal and value is shorter sequence
-                if value > alpha {
-                    alpha = value;
-                }
-
-                if value >= beta {
-                    // beta cutoff, return early
-                    return best_value;
-                }
+            /* // value either has higher value or both are terminal and value is shorter sequence
+            if value > alpha {
+                alpha = value;
             }
+
+            if value >= beta {
+                // beta cutoff, return early
+                return best_value;
+            } */
         }
 
         best_value
@@ -147,32 +140,24 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
 
         let legal_moves = board.legal_moves(Player::White);
 
-        let mut current_best_value;
-
-        // #[cfg(debug_assertions)]
-        {
-            current_best_value = Valuation::TerminalBlackWin { plies: 0 };
-        }
+        let mut current_best_value = Valuation::TerminalBlackWin { plies: 0 };
 
         for max_depth in 0.. {
             let mut best_value = TerminalBlackWin { plies: 0 };
             let mut best_move = legal_moves[0];
 
             let mut value;
-            let mut alpha = TerminalBlackWin { plies: 0 };
-            let beta = TerminalWhiteWin { plies: 0 };
+            /* let mut alpha = TerminalBlackWin { plies: 0 };
+            let beta = TerminalWhiteWin { plies: 0 }; */
 
             for current_move in legal_moves.iter() {
                 if !me.search_state.lock().unwrap().search_active {
                     // since max_depth search never completed: max_depth - 1
-                    // #[cfg(debug_assertions)]
-                    {
+                    if LOG_STATS {
                         println!("--------------------------------------------");
                         println!("* Minimax worker exited after max_depth {}", max_depth - 1);
                         println!("* Best move had value {:?}", current_best_value);
                         println!("* NPS: {:.2e}", me.current_nps());
-                        println!("* alpha-beta pruning: {}", ALPHA_BETA_PRUNE);
-                        println!("* weak move ordering");
                         println!("--------------------------------------------\n");
                     }
                     return;
@@ -186,12 +171,12 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
                 }
 
                 value = {
-                    let (their_alpha, their_beta) = match their_move {
+                    /* let (their_alpha, their_beta) = match their_move {
                         true => (-beta, -alpha),
                         false => (alpha, beta),
-                    };
+                    }; */
 
-                    let their_value = me.minimax(&next_board, max_depth, their_alpha, their_beta);
+                    let their_value = me.minimax(&next_board, max_depth /* , their_alpha, their_beta */);
 
                     match their_move {
                         true => -their_value,
@@ -206,8 +191,7 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
                     best_move = *current_move;
 
                     if let Valuation::TerminalWhiteWin { plies: _plies } = best_value {
-                        #[cfg(debug_assertions)]
-                        {
+                        if LOG_STATS {
                             println!("--------------------------------------------");
                             println!("* Found certain win in {} plies", _plies);
                             println!("--------------------------------------------\n");
@@ -223,9 +207,9 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
                     }
                 }
 
-                if ALPHA_BETA_PRUNE && value >= alpha {
+                /* if value >= alpha {
                     alpha = value;
-                }
+                } */
 
                 // no beta cutoff since beta is always -inf
                 /* if value >= beta {
@@ -245,8 +229,7 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
 
             if let TerminalBlackWin { plies: _plies } = current_best_value {
                 // all moves are certain losses, pick the one with the most plies and exit
-                #[cfg(debug_assertions)]
-                {
+                if LOG_STATS {
                     println!("--------------------------------------------");
                     println!("* Found certain loss in {} plies", _plies);
                     println!("--------------------------------------------");
@@ -261,11 +244,7 @@ impl<const ALPHA_BETA_PRUNE: bool> MinimaxWorker<ALPHA_BETA_PRUNE> {
 
 /*====================================================================================================================*/
 
-pub fn minimax_search<const ALPHA_BETA_PRUNE: bool>(
-    board: &Board,
-    valuation_fn: ValuationFn,
-    search_state: SharedMinimaxSearchState,
-) {
+pub fn minimax_search(board: &Board, valuation_fn: ValuationFn, search_state: SharedMinimaxSearchState) {
     assert!(
         board.has_legal_move(),
         "Called minimax_search on board with no legal moves"
@@ -274,11 +253,14 @@ pub fn minimax_search<const ALPHA_BETA_PRUNE: bool>(
     let t_handle;
 
     {
-        let worker_board = board.clone();
+        // let worker_board = board.clone();
 
-        t_handle = std::thread::spawn(move || {
-            let worker: MinimaxWorker<ALPHA_BETA_PRUNE> = MinimaxWorker::new(valuation_fn, search_state);
-            worker.start_search(worker_board);
+        t_handle = std::thread::spawn({
+            let board = board.clone();
+            move || {
+                let worker: MinimaxWorker = MinimaxWorker::new(valuation_fn, search_state);
+                worker.start_search(board);
+            }
         });
     }
 

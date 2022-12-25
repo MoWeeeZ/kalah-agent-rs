@@ -8,7 +8,7 @@ pub enum AgentState {
 }
 
 pub trait Agent {
-    fn set_board(&mut self, board: &Board);
+    fn update_board(&mut self, board: &Board);
     fn get_current_best_move(&mut self) -> Move;
 
     fn get_state(&self) -> AgentState;

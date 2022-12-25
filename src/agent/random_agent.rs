@@ -21,12 +21,14 @@ impl RandomAgent {
 }
 
 impl Agent for RandomAgent {
-    fn set_board(&mut self, board: &Board) {
+    fn update_board(&mut self, board: &Board) {
         self.board = board.clone();
     }
 
     fn get_current_best_move(&mut self) -> Move {
         assert_eq!(self.state, AgentState::Go);
+
+        self.state = AgentState::Waiting;
 
         *self.board.legal_moves(Player::White).choose(&mut thread_rng()).unwrap()
     }

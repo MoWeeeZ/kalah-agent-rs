@@ -20,7 +20,7 @@ impl FirstMoveAgent {
 }
 
 impl Agent for FirstMoveAgent {
-    fn set_board(&mut self, board: &Board) {
+    fn update_board(&mut self, board: &Board) {
         self.board = board.clone();
     }
 

@@ -2,6 +2,7 @@ use std::net::TcpStream;
 
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{connect, Error, WebSocket};
+use url::Url;
 
 use super::Command;
 
@@ -12,7 +13,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(url: &str) -> Result<Self, Error> {
+    pub fn new(url: &Url) -> Result<Self, Error> {
         connect(url).map(|(mut websocket, _)| {
             match websocket.get_mut() {
                 MaybeTlsStream::Plain(s) => s
@@ -47,16 +48,20 @@ impl Connection {
         self.websocket.write_message(msg.into()).unwrap()
     }
 
-    pub fn read_command(&mut self) -> Result<Command, Error> {
-        self.read().map(|msg| msg.parse().unwrap())
+    pub fn read_command(&mut self) -> Option<Command> {
+        match self.read().map(|msg| msg.parse().unwrap()) {
+            Ok(cmd) => Some(cmd),
+            Err(tungstenite::Error::Io(_)) => None,
+            Err(err) => panic!("Could not read command: {}", err),
+        }
     }
 
     pub fn write_command(&mut self, cmd: &str, ref_id: Option<u32>) {
-        let mut msg = format!("{} ", self.next_id);
-
-        if let Some(id_ref) = ref_id {
-            msg += &format!("@{id_ref} ");
-        }
+        let mut msg = if let Some(id_ref) = ref_id {
+            format!("{}@{} ", self.next_id, id_ref)
+        } else {
+            format!("{} ", self.next_id)
+        };
 
         msg += cmd;
         msg += "\r\n";
