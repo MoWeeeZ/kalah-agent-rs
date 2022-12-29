@@ -179,7 +179,7 @@ impl Board {
                 for seed in self.our_houses() {
                     write!(s, ", {}", seed).unwrap();
                 }
-                for seed in self.their_houses().iter().rev() {
+                for seed in self.their_houses() {
                     write!(s, ", {}", seed).unwrap();
                 }
 

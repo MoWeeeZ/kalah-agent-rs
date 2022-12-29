@@ -50,6 +50,7 @@ impl Agent for MinimaxAgent {
     fn go(&mut self) {
         // use first legal move as a fallback in case we don't complete a single search iteration, which really should
         // not happen
+        // calling go() with a board with no legal moves is illegal
         let fallback_move = *self.board.legal_moves(Player::White).first().unwrap();
         let search_state = new_shared_minimax_search_state(true, fallback_move);
 

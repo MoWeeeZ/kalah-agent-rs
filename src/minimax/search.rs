@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-// use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng};
 
 use crate::kalah::valuation::{Valuation, ValuationFn};
 use crate::{Board, Move, Player};
 
 const LOG_STATS: bool = false;
+const DETERMINISTIC_MOVE: bool = true;
 
 /*====================================================================================================================*/
 
@@ -51,64 +52,36 @@ impl MinimaxWorker {
         self.total_nodes_visited as f64 / self.start_t.elapsed().as_secs_f64()
     }
 
-    fn minimax(&mut self, board: &Board, remaining_depth: u32, alpha: Valuation, beta: Valuation) -> (Move, Valuation) {
+    fn minimax(&mut self, board: Board, remaining_depth: u32, alpha: Valuation, beta: Valuation) -> (Move, Valuation) {
+        if !self.search_state.lock().unwrap().search_active {
+            // search has been ended, search results don't matter anymore, exit thread asap
+            return (Move::new(127, Player::White), Valuation::NonTerminal { value: 0 });
+        }
+
         self.total_nodes_visited += 1;
 
         if remaining_depth == 0 || !board.has_legal_move() {
-            return (Move::new(127, Player::White), (self.valuation_fn)(board));
+            return (Move::new(127, Player::White), (self.valuation_fn)(&board));
         }
 
-        let legal_moves = board.legal_moves(Player::White);
-
-        // immediate win for Black
-        let mut best_move = Move::new(0, Player::White);
+        let mut best_move = Move::new(127, Player::White);
         let mut best_value = Valuation::TerminalBlackWin { plies: 0 };
         let mut alpha = alpha;
 
-        for move_ in legal_moves {
-            let mut next_board = board.clone();
-            let their_next_move = !next_board.apply_move(move_);
+        for move_ in board.legal_moves(Player::White) {
+            let mut board_after_move = board.clone();
+            let their_turn = !board_after_move.apply_move(move_);
 
-            // run minimax on child; if neccessary, shuffle and negate value, alpha, and beta from their perspective to ours
-            let value = {
-                if their_next_move {
-                    next_board.flip_board();
-                }
-
-                let (their_alpha, their_beta) = if their_next_move {
-                    (-beta, -alpha)
-                } else {
-                    (alpha, beta)
-                };
-
-                // if next move is by opponent: decrease remaining_depth
-                // if it's a bonus move, don't decrease to keep the game tree balanced
-                let next_remaining_depth = if their_next_move {
-                    remaining_depth - 1
-                } else {
-                    remaining_depth
-                };
-
-                let (_, their_value) = self.minimax(&next_board, next_remaining_depth, their_alpha, their_beta);
-
-                if their_next_move {
-                    -their_value.increase_plies()
-                } else {
-                    their_value.increase_plies()
-                }
-            };
-
-            /* let value = if their_next_move {
-                next_board.flip_board();
-                -self.minimax(&next_board, remaining_depth - 1, -beta, -alpha)
+            let value = if their_turn {
+                board_after_move.flip_board();
+                -self.minimax(board_after_move, remaining_depth - 1, -beta, -alpha).1
             } else {
-                self.minimax(&next_board, remaining_depth, alpha, beta)
+                // bonus move: don't decrease depth and don't switch perspective
+                self.minimax(board_after_move, remaining_depth, alpha, beta).1
             }
-            .increase_plies(); */
+            .increase_plies();
 
-            if value > best_value
-            /* || value == best_value && thread_rng().gen::<bool>() */
-            {
+            if value > best_value || !DETERMINISTIC_MOVE && value == best_value && thread_rng().gen::<bool>() {
                 best_move = move_;
                 best_value = value;
             }
@@ -119,8 +92,8 @@ impl MinimaxWorker {
             }
 
             // value either has higher value or both are terminal and value is shorter sequence
-            if value > alpha {
-                alpha = value;
+            if best_value > alpha {
+                alpha = best_value;
             }
         }
 
@@ -134,45 +107,16 @@ impl MinimaxWorker {
 
         me.start_t = std::time::Instant::now();
 
-        let mut current_best_value /* = Valuation::TerminalBlackWin { plies: 0 } */;
+        let mut current_best_value = Valuation::TerminalBlackWin { plies: 0 };
 
         let alpha = TerminalBlackWin { plies: 0 };
         let beta = TerminalWhiteWin { plies: 0 };
 
-        for max_depth in 1.. {
-            let (best_move, best_value) = me.minimax(&board, max_depth, alpha, beta);
-
-            // *current_best_move.lock().unwrap() = best_move;
-            me.search_state.lock().unwrap().current_best_move = best_move;
-            current_best_value = best_value;
-
-            if let Valuation::TerminalWhiteWin { plies } = best_value {
-                if LOG_STATS {
-                    println!("--------------------------------------------");
-                    println!("* Found certain win in {} plies", plies);
-                    println!("--------------------------------------------\n");
-                }
-                // *current_best_move.lock().unwrap() = best_move;
-                // search_active.store(false, Ordering::Release);
-                {
-                    let mut search_state = me.search_state.lock().unwrap();
-                    search_state.current_best_move = best_move;
-                    search_state.search_active = false;
-                }
-                return;
-            }
-
-            if let TerminalBlackWin { plies } = current_best_value {
-                // all moves are certain losses, pick the one with the most plies and exit
-                if LOG_STATS {
-                    println!("--------------------------------------------");
-                    println!("* Found certain loss in {} plies", plies);
-                    println!("--------------------------------------------");
-                    println!();
-                }
-                me.search_state.lock().unwrap().search_active = false;
-                return;
-            }
+        let max_depth = 2;
+        /* for max_depth in 1..=6 */
+        {
+            // let board = board.clone();
+            let (best_move, best_value) = me.minimax(board, max_depth, alpha, beta);
 
             if !me.search_state.lock().unwrap().search_active {
                 if LOG_STATS {
@@ -184,9 +128,50 @@ impl MinimaxWorker {
                 }
                 return;
             }
+
+            if let Valuation::TerminalWhiteWin { plies } = best_value {
+                if LOG_STATS {
+                    println!("--------------------------------------------");
+                    println!("* Found certain win in {} plies", plies);
+                    println!("--------------------------------------------\n");
+                }
+                {
+                    let mut search_state = me.search_state.lock().unwrap();
+                    search_state.current_best_move = best_move;
+                    search_state.search_active = false;
+                }
+                return;
+            }
+
+            if let TerminalBlackWin { plies } = best_value {
+                // all moves are certain losses, pick the one with the most plies and exit
+                if LOG_STATS {
+                    println!("--------------------------------------------");
+                    println!("* Found certain loss in {} plies", plies);
+                    println!("--------------------------------------------");
+                    println!();
+                }
+                {
+                    let mut search_state = me.search_state.lock().unwrap();
+                    search_state.current_best_move = best_move;
+                    search_state.search_active = false;
+                }
+                return;
+            }
+
+            me.search_state.lock().unwrap().current_best_move = best_move;
+            current_best_value = best_value;
         }
 
         me.search_state.lock().unwrap().search_active = false;
+
+        if LOG_STATS {
+            println!("--------------------------------------------");
+            println!("* Minimax worker exited after exhausting search");
+            println!("* Best move had value {:?}", current_best_value);
+            println!("* NPS: {:.2e}", me.current_nps());
+            println!("--------------------------------------------\n");
+        }
     }
 }
 

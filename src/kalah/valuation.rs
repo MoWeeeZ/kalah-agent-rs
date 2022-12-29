@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{Board, House};
 
 /// # Safety
@@ -24,6 +26,17 @@ impl Valuation {
             TerminalWhiteWin { plies: steps } => TerminalWhiteWin { plies: steps + 1 },
             TerminalBlackWin { plies: steps } => TerminalBlackWin { plies: steps + 1 },
             TerminalDraw { plies: steps } => TerminalDraw { plies: steps + 1 },
+        }
+    }
+}
+
+impl Display for Valuation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Valuation::NonTerminal { value } => write!(f, "{}", value),
+            Valuation::TerminalWhiteWin { plies } => write!(f, "WhiteWin({})", plies),
+            Valuation::TerminalBlackWin { plies } => write!(f, "BlackWin({})", plies),
+            Valuation::TerminalDraw { plies } => write!(f, "Draw({})", plies),
         }
     }
 }
@@ -94,36 +107,28 @@ pub fn store_diff_valuation(board: &Board) -> Valuation {
     // let our_houses_sum = board.our_houses().iter().sum::<u16>() as i16;
     // let their_houses_sum = board.their_houses().iter().sum::<u16>() as i16;
 
+    let store_diff = our_store - their_store;
+
     if !board.has_legal_move() {
         // no move left or more than half the seeds in one players store -> this is a terminal node
         // meaning the player with more seeds in their store wins the game
         // thus if White has more seeds in the store (i.e. score_diff > 0) this node is a guaranteed win
         // and vice versa. If both have the same number, it's a draw with value 0.0
-        let score_diff = our_store - their_store;
 
-        return match score_diff {
+        return match store_diff {
             val if val > 0 => TerminalWhiteWin { plies: 0 },
             val if val < 0 => TerminalBlackWin { plies: 0 },
             val if val == 0 => TerminalDraw { plies: 0 },
-            // val => panic!("Value has invalid value {}", val),
             _ => unreachable!(),
         };
     }
 
-    // let total_seeds = our_store + our_houses_sum + their_store + their_houses_sum;
-
-    // let score = ((1.0 + EPS) * our_store) - ((1.0 + EPS) * their_store);
-    let score = our_store - their_store;
-
-    NonTerminal { value: score }
+    NonTerminal { value: store_diff }
 }
 
 #[allow(dead_code)]
 pub fn seed_diff_valuation(board: &Board) -> Valuation {
     use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
-
-    // const EPS: f32 = 1.0 / u16::MAX as f32;
-    // const EPS: f32 = 1e-5;S
 
     let our_store = board.our_store as i32;
     let their_store = board.their_store as i32;
@@ -136,9 +141,9 @@ pub fn seed_diff_valuation(board: &Board) -> Valuation {
         // meaning the player with more seeds in their store wins the game
         // thus if White has more seeds in the store (i.e. score_diff > 0) this node is a guaranteed win
         // and vice versa. If both have the same number, it's a draw with value 0.0
-        let score_diff = our_store - their_store;
+        let store_diff = our_store - their_store;
 
-        return match score_diff {
+        return match store_diff {
             val if val > 0 => TerminalWhiteWin { plies: 0 },
             val if val < 0 => TerminalBlackWin { plies: 0 },
             val if val == 0 => TerminalDraw { plies: 0 },
@@ -160,4 +165,42 @@ pub fn seed_diff_valuation(board: &Board) -> Valuation {
     let score = seed_diff;
 
     NonTerminal { value: score }
+}
+
+/*====================================================================================================================*/
+
+#[cfg(test)]
+mod tests {
+    use super::Valuation;
+
+    #[test]
+    fn test_cmp() {
+        use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
+
+        let nt1 = NonTerminal { value: -5 };
+        let nt2 = NonTerminal { value: 5 };
+
+        let ww1 = TerminalWhiteWin { plies: 5 };
+        let ww2 = TerminalWhiteWin { plies: 10 };
+
+        let bw1 = TerminalBlackWin { plies: 5 };
+        let bw2 = TerminalBlackWin { plies: 10 };
+
+        let draw1 = TerminalDraw { plies: 5 };
+        let draw2 = TerminalDraw { plies: 10 };
+
+        assert!(nt1 < nt2);
+        assert!(ww1 > ww2);
+        assert!(bw1 < bw2);
+        assert!(draw1 < draw2);
+
+        assert!(bw1 < nt1);
+        assert!(nt1 < draw1);
+        assert!(draw1 < nt2);
+        assert!(nt2 < ww1);
+
+        assert!(bw1 < draw1);
+        assert!(draw1 < ww1);
+        assert!(bw1 < ww1);
+    }
 }
