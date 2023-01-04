@@ -98,14 +98,8 @@ pub type ValuationFn = fn(&Board) -> Valuation;
 pub fn store_diff_valuation(board: &Board) -> Valuation {
     use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
 
-    // const EPS: f32 = 1.0 / u16::MAX as f32;
-    // const EPS: f32 = 1e-5;
-
     let our_store = board.our_store as i32;
     let their_store = board.their_store as i32;
-
-    // let our_houses_sum = board.our_houses().iter().sum::<u16>() as i16;
-    // let their_houses_sum = board.their_houses().iter().sum::<u16>() as i16;
 
     let store_diff = our_store - their_store;
 
@@ -116,9 +110,40 @@ pub fn store_diff_valuation(board: &Board) -> Valuation {
         // and vice versa. If both have the same number, it's a draw with value 0.0
 
         return match store_diff {
-            val if val > 0 => TerminalWhiteWin { plies: 0 },
-            val if val < 0 => TerminalBlackWin { plies: 0 },
-            val if val == 0 => TerminalDraw { plies: 0 },
+            store_diff if store_diff > 0 => TerminalWhiteWin { plies: 0 },
+            store_diff if store_diff < 0 => TerminalBlackWin { plies: 0 },
+            store_diff if store_diff == 0 => TerminalDraw { plies: 0 },
+            _ => unreachable!(),
+        };
+    }
+
+    NonTerminal { value: store_diff }
+}
+
+#[allow(dead_code)]
+pub fn store_diff_valuation2(board: &Board) -> Valuation {
+    use Valuation::{NonTerminal, TerminalBlackWin, TerminalDraw, TerminalWhiteWin};
+
+    let our_store = board.our_store as i32;
+    let their_store = board.their_store as i32;
+
+    let our_houses_sum = board.our_houses().iter().sum::<u16>() as i32;
+    let their_houses_sum = board.their_houses().iter().sum::<u16>() as i32;
+
+    let half_total_seeds = (our_store + our_houses_sum + their_store + their_houses_sum) / 2;
+
+    let store_diff = our_store - their_store;
+
+    if !board.has_legal_move() || our_store > half_total_seeds || their_store > half_total_seeds {
+        // no move left or more than half the seeds in one players store -> this is a terminal node
+        // meaning the player with more seeds in their store wins the game
+        // thus if White has more seeds in the store (i.e. score_diff > 0) this node is a guaranteed win
+        // and vice versa. If both have the same number, it's a draw with value 0.0
+
+        return match store_diff {
+            store_diff if store_diff > 0 => TerminalWhiteWin { plies: 0 },
+            store_diff if store_diff < 0 => TerminalBlackWin { plies: 0 },
+            store_diff if store_diff == 0 => TerminalDraw { plies: 0 },
             _ => unreachable!(),
         };
     }
@@ -144,9 +169,9 @@ pub fn seed_diff_valuation(board: &Board) -> Valuation {
         let store_diff = our_store - their_store;
 
         return match store_diff {
-            val if val > 0 => TerminalWhiteWin { plies: 0 },
-            val if val < 0 => TerminalBlackWin { plies: 0 },
-            val if val == 0 => TerminalDraw { plies: 0 },
+            store_diff if store_diff > 0 => TerminalWhiteWin { plies: 0 },
+            store_diff if store_diff < 0 => TerminalBlackWin { plies: 0 },
+            store_diff if store_diff == 0 => TerminalDraw { plies: 0 },
             // val => panic!("Value has invalid value {}", val),
             _ => unreachable!(),
         };

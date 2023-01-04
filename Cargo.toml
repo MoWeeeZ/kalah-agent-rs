@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.20.0"
+ctrlc = "3.2.4"
 lazy_static = "1.4"
 num_cpus = "1.14"
 rand = "0.8"

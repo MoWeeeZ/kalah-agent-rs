@@ -10,14 +10,15 @@ We persused the following idea:
 
   - minimax search
   - alpha-beta pruning
-  - some implementation details from the example python agent, in particular KGP parsing and game state handling
 
 Implementation
 --------------
 
 Our agent was written as follows:
 
-  WRITEME (obligatory)
+  - 50% after 12am, 100% on medically unadvisory levels of caffeine
+  - some implementation details from the example python agent were used as a reference, in particular concerning KGP
+    parsing and game state handling
 
 CAVEATS
 -------

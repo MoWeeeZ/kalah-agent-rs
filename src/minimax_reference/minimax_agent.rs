@@ -3,11 +3,13 @@ use std::sync::Arc;
 use crate::kalah::ValuationFn;
 use crate::{Board, Move, Player};
 
-use super::search::{minimax_search, new_shared_minimax_search_state, SharedMinimaxSearchState};
+use super::search::{new_shared_minimax_search_state, start_search, SharedMinimaxSearchState};
 use crate::agent::{Agent, AgentState};
 
 pub struct MinimaxAgent {
     state: AgentState,
+
+    max_depth: u32,
 
     board: Board,
 
@@ -18,9 +20,10 @@ pub struct MinimaxAgent {
 
 impl MinimaxAgent {
     #[allow(dead_code)]
-    pub fn new(board: Board, valuation_fn: ValuationFn) -> Self {
+    pub fn new(board: Board, max_depth: u32, valuation_fn: ValuationFn) -> Self {
         MinimaxAgent {
             state: AgentState::Waiting,
+            max_depth,
             board,
             search_state: None,
             valuation_fn,
@@ -54,7 +57,12 @@ impl Agent for MinimaxAgent {
         let fallback_move = *self.board.legal_moves(Player::White).first().unwrap();
         let search_state = new_shared_minimax_search_state(true, fallback_move);
 
-        minimax_search(&self.board, self.valuation_fn, Arc::clone(&search_state));
+        start_search(
+            &self.board,
+            self.max_depth,
+            self.valuation_fn,
+            Arc::clone(&search_state),
+        );
 
         self.state = AgentState::Go;
         self.search_state = Some(search_state);
@@ -76,5 +84,9 @@ impl Agent for MinimaxAgent {
     fn ponder(&mut self) {
         // self.state = AgentState::Ponder;
         todo!()
+    }
+
+    fn is_reference(&self) -> bool {
+        true
     }
 }

@@ -15,4 +15,8 @@ pub trait Agent {
     fn go(&mut self);
     fn stop(&mut self);
     fn ponder(&mut self);
+
+    fn is_reference(&self) -> bool {
+        false
+    }
 }

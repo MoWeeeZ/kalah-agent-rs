@@ -1,13 +1,10 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use rand::{thread_rng, Rng};
-
 use crate::kalah::valuation::{Valuation, ValuationFn};
 use crate::{Board, Move, Player};
 
 const LOG_STATS: bool = false;
-const DETERMINISTIC_MOVE: bool = true;
 
 /*====================================================================================================================*/
 
@@ -73,20 +70,21 @@ impl MinimaxWorker {
             let their_turn = !board_after_move.apply_move(move_);
 
             let value = if their_turn {
+                // opponent move: flip board, alpha, beta to their perspective and flip returned value to ours
                 board_after_move.flip_board();
                 -self.minimax(board_after_move, remaining_depth - 1, -beta, -alpha).1
             } else {
-                // bonus move: don't decrease depth and don't switch perspective
+                // bonus move: don't decrease depth
                 self.minimax(board_after_move, remaining_depth, alpha, beta).1
             }
             .increase_plies();
 
-            if value > best_value || !DETERMINISTIC_MOVE && value == best_value && thread_rng().gen::<bool>() {
+            if value >= best_value {
                 best_move = move_;
                 best_value = value;
             }
 
-            if value >= beta {
+            if value > beta {
                 // beta cutoff, return early
                 break;
             }
@@ -112,10 +110,10 @@ impl MinimaxWorker {
         let alpha = TerminalBlackWin { plies: 0 };
         let beta = TerminalWhiteWin { plies: 0 };
 
-        let max_depth = 2;
-        /* for max_depth in 1..=6 */
-        {
-            // let board = board.clone();
+        let max_depth = 6;
+        // {
+        for max_depth in 6.. {
+            let board = board.clone();
             let (best_move, best_value) = me.minimax(board, max_depth, alpha, beta);
 
             if !me.search_state.lock().unwrap().search_active {
@@ -123,7 +121,7 @@ impl MinimaxWorker {
                     println!("--------------------------------------------");
                     println!("* Minimax worker exited after max_depth {}", max_depth - 1);
                     println!("* Best move had value {:?}", current_best_value);
-                    println!("* NPS: {:.2e}", me.current_nps());
+                    println!("* NPS: {:.2e} ({:?})", me.current_nps(), me.start_t.elapsed());
                     println!("--------------------------------------------\n");
                 }
                 return;
@@ -167,9 +165,13 @@ impl MinimaxWorker {
 
         if LOG_STATS {
             println!("--------------------------------------------");
-            println!("* Minimax worker exited after exhausting search");
-            println!("* Best move had value {:?}", current_best_value);
-            println!("* NPS: {:.2e}", me.current_nps());
+            println!("* Minimax worker exited after search depth {}", max_depth);
+            println!(
+                "* Best move {} had value {:?}",
+                me.search_state.lock().unwrap().current_best_move,
+                current_best_value
+            );
+            println!("* NPS: {:.2e} ({:?})", me.current_nps(), me.start_t.elapsed());
             println!("--------------------------------------------\n");
         }
     }

@@ -28,6 +28,12 @@ pub enum Command {
         id: Option<u32>,
         ref_id: Option<u32>,
     },
+    Set {
+        id: Option<u32>,
+        ref_id: Option<u32>,
+        option: String,
+        value: String,
+    },
     Ping {
         id: Option<u32>,
         ref_id: Option<u32>,
@@ -88,7 +94,7 @@ impl FromStr for Command {
             .transpose()
             .map_err(|_| "Could not parse id")?;
 
-        let id_ref = command_captures
+        let ref_id = command_captures
             .name("ref")
             .map(|capture| capture.as_str().parse::<u32>())
             .transpose()
@@ -122,7 +128,7 @@ impl FromStr for Command {
 
                 Ok(Command::Kpg {
                     id,
-                    ref_id: id_ref,
+                    ref_id,
                     major,
                     minor,
                     patch,
@@ -137,28 +143,38 @@ impl FromStr for Command {
 
                 let board = Board::from_kpg(args_vec[0]);
 
-                Ok(Command::State {
+                Ok(Command::State { id, ref_id, board })
+            }
+            "stop" => Ok(Command::Stop { id, ref_id }),
+            "ok" => Ok(Command::Ok { id, ref_id }),
+            "set" => {
+                let args_vec: Vec<&str> = args.split_ascii_whitespace().collect();
+
+                if args_vec.len() != 2 {
+                    return Err(format!("Unexpected args for set command: \"{}\"", args));
+                }
+
+                Ok(Command::Set {
                     id,
-                    ref_id: id_ref,
-                    board,
+                    ref_id,
+                    option: args_vec[0].to_owned(),
+                    value: args_vec[1].to_owned(),
                 })
             }
-            "stop" => Ok(Command::Stop { id, ref_id: id_ref }),
-            "ok" => Ok(Command::Ok { id, ref_id: id_ref }),
             "ping" => Ok(Command::Ping {
                 id,
-                ref_id: id_ref,
+                ref_id,
                 msg: args.to_owned(),
             }),
             "pong" => Ok(Command::Pong {
                 id,
-                ref_id: id_ref,
+                ref_id,
                 msg: args.to_owned(),
             }),
-            "goodbye" => Ok(Command::Goodbye { id, ref_id: id_ref }),
+            "goodbye" => Ok(Command::Goodbye { id, ref_id }),
             "error" => Ok(Command::Error {
                 id,
-                ref_id: id_ref,
+                ref_id,
                 msg: args.to_owned(),
             }),
             _ => Err(format!("Unknown command {}", cmd)),
@@ -210,6 +226,20 @@ impl Display for Command {
                     write!(f, "@{}", ref_id)?;
                 }
                 write!(f, " ok")
+            }
+            Command::Set {
+                id,
+                ref_id,
+                option,
+                value,
+            } => {
+                if let Some(id) = id {
+                    write!(f, "{}", id)?;
+                }
+                if let Some(ref_id) = ref_id {
+                    write!(f, "@{}", ref_id)?;
+                }
+                write!(f, " set {} {}", option, value)
             }
             Command::Ping { id, ref_id, msg } => {
                 if let Some(id) = id {

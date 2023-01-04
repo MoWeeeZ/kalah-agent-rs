@@ -1,0 +1,2 @@
+docker build -t kalah .
+docker run [--it] --rm --name kalah-app kalah 
