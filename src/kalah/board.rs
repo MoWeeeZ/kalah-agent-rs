@@ -167,6 +167,23 @@ impl Board {
         Board::from_parts(h, our_houses_vec, their_houses_vec, our_store, their_store, false)
     }
 
+    /// clone other into self, overwriting the old values, but not reallocating memory
+    pub fn clone_from(&mut self, other: &Board) {
+        assert!(self.h == other.h, "Tried to clone_from board of different h");
+
+        let h = self.h as usize;
+
+        unsafe {
+            std::ptr::copy_nonoverlapping(other.our_houses_ptr, self.our_houses_ptr, h);
+            std::ptr::copy_nonoverlapping(other.their_houses_ptr, self.their_houses_ptr, h);
+        }
+
+        self.our_store = other.our_store;
+        self.their_store = other.their_store;
+
+        self.flipped = other.flipped
+    }
+
     pub fn to_kgp(&self) -> String {
         use std::fmt::Write;
 
@@ -363,6 +380,13 @@ impl Board {
             .filter(|&(_house_num, &house)| house != 0)
             .map(|(house_num, _house)| Move::new(house_num as u8, player))
             .collect()
+    }
+
+    pub fn is_legal_move(&self, move_: Move) -> bool {
+        match move_.player() {
+            Player::White => self.our_houses()[move_.house() as usize] != 0,
+            Player::Black => self.their_houses()[move_.house() as usize] != 0,
+        }
     }
 
     pub fn has_legal_move(&self) -> bool {

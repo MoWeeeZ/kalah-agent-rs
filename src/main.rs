@@ -7,21 +7,23 @@ mod kalah;
 mod kgp;
 mod minimax;
 mod minimax_reference;
+mod pvs;
 mod util;
 
 use agent::{Agent, AgentState};
 pub use kalah::{Board, House, Move, Player};
-use kgp::kgp_connect;
 use rand::{thread_rng, Rng};
 use threadpool::ThreadPool;
-use url::Url;
 
 use crate::util::advance_random;
 
-static THINKING_TIME: Duration = Duration::from_secs(3);
-
-fn single_ply(board: &mut Board, playing_agent: &mut impl Agent, player: Player, print: bool) -> Player {
-    if print {
+fn single_ply<const DO_LOGGING: bool>(
+    board: &mut Board,
+    playing_agent: &mut impl Agent,
+    player: Player,
+    thinking_time: Duration,
+) -> Player {
+    if DO_LOGGING {
         println!("{}\n", board);
     }
 
@@ -41,7 +43,7 @@ fn single_ply(board: &mut Board, playing_agent: &mut impl Agent, player: Player,
     let mut player_move = playing_agent.get_current_best_move();
 
     while playing_agent.get_state() == AgentState::Go
-        && (playing_agent.is_reference() || start_time.elapsed() < THINKING_TIME)
+        && (playing_agent.is_reference() || start_time.elapsed() < thinking_time)
     {
         player_move = playing_agent.get_current_best_move();
 
@@ -66,13 +68,13 @@ fn single_ply(board: &mut Board, playing_agent: &mut impl Agent, player: Player,
         println!("Invalid move, using {} instead", player_move); */
     }
 
-    if print {
+    if DO_LOGGING {
         println!("{}: playing move {}", player, player_move);
     }
 
     let moves_again = board.apply_move(player_move);
 
-    if print {
+    if DO_LOGGING {
         println!();
     }
 
@@ -83,7 +85,12 @@ fn single_ply(board: &mut Board, playing_agent: &mut impl Agent, player: Player,
     }
 }
 
-fn game_loop(board: Board, white_agent: impl Agent, black_agent: impl Agent, print: bool) -> Board {
+fn game_loop<const DO_LOGGING: bool>(
+    board: Board,
+    white_agent: impl Agent,
+    black_agent: impl Agent,
+    thinking_time: Duration,
+) -> Board {
     use Player::{Black, White};
 
     let mut current_player = if !board.flipped() { White } else { Black };
@@ -94,8 +101,8 @@ fn game_loop(board: Board, white_agent: impl Agent, black_agent: impl Agent, pri
 
     loop {
         current_player = match current_player {
-            White => single_ply(&mut board, &mut white_agent, White, print),
-            Black => single_ply(&mut board, &mut black_agent, Black, print),
+            White => single_ply::<DO_LOGGING>(&mut board, &mut white_agent, White, thinking_time),
+            Black => single_ply::<DO_LOGGING>(&mut board, &mut black_agent, Black, thinking_time),
         };
 
         if !board.has_legal_move() {
@@ -113,8 +120,9 @@ where
     BlackAgent: Agent,
 {
     let board = Board::new(h, s);
+    let thinking_time = Duration::from_secs(3);
 
-    let board = game_loop(board, white_agent, black_agent, true);
+    let board = game_loop::<true>(board, white_agent, black_agent, thinking_time);
 
     println!("\nFinal board:\n\n{}\n", board);
 
@@ -140,6 +148,8 @@ pub fn test_agents<Agent1, Agent2>(
 
     // let num_workers = 8;
     let num_workers = num_cpus::get() / 2;
+
+    let thinking_time = Duration::from_secs(2);
 
     println!("Running with {} workers", num_workers);
 
@@ -174,7 +184,7 @@ pub fn test_agents<Agent1, Agent2>(
             move || {
                 use std::cmp::Ordering::{Equal, Greater, Less};
 
-                let board = game_loop(board, agent1, agent2, false);
+                let board = game_loop::<false>(board, agent1, agent2, thinking_time);
 
                 match board.our_store.cmp(&board.their_store) {
                     Less => agent2_black_wins.fetch_add(1, Ordering::Release),
@@ -198,7 +208,7 @@ pub fn test_agents<Agent1, Agent2>(
             move || {
                 use std::cmp::Ordering::{Equal, Greater, Less};
 
-                let board = game_loop(board, agent2, agent1, false);
+                let board = game_loop::<false>(board, agent2, agent1, thinking_time);
 
                 match board.our_store.cmp(&board.their_store) {
                     Less => agent1_black_wins.fetch_add(1, Ordering::Release),
@@ -281,10 +291,10 @@ pub fn compare_agents(board: Board, mut agent1: impl Agent, mut agent2: impl Age
 }
 
 fn main() {
-    /* let h = 8;
-    let s = 8; */
+    let h = 8;
+    let s = 8;
 
-    /* // let white_agent = agent::RandomAgent::new(h, s);
+    // let white_agent = agent::RandomAgent::new(h, s);
     let white_agent = minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
     // let white_agent = agent::FirstMoveAgent::new(h, s);
 
@@ -292,28 +302,35 @@ fn main() {
     let black_agent = minimax_reference::MinimaxAgent::new(Board::new(h, s), 6, kalah::valuation::store_diff_valuation);
     // let black_agent = agent::FirstMoveAgent::new(h, s);
 
-    play_game(h, s, white_agent, black_agent); */
+    play_game(h, s, white_agent, black_agent);
 
     // let mut board = Board::new(h, s);
     // advance_random(h, s, &mut board, 2 * h as usize);
     // compare_agents(board, white_agent, black_agent);
+}
 
-    /* let agent1_builder = &|| minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
+/* fn main() {
+    let h = 8;
+    let s = 8;
+
+    let agent1_builder = &|| minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
 
     // let agent2_builder = &|| agent::RandomAgent::new(h, s);
     // let agent2_builder =
     //     &|| minimax_reference::MinimaxAgent::new(Board::new(h, s), 6, kalah::valuation::store_diff_valuation);
-    let agent2_builder = &|| minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::seed_diff_valuation);
+    let agent2_builder = &|| minimax2::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
 
-    test_agents(h, s, agent1_builder, agent2_builder, 16 * 8); */
+    test_agents(h, s, agent1_builder, agent2_builder, 4 * 8);
+} */
 
-    let url: Url = "wss://kalah.kwarc.info/socket".parse().unwrap();
+/* fn main() {
+    let url: url::Url = "wss://kalah.kwarc.info/socket".parse().unwrap();
     // url.set_port(Some(2671)).unwrap();
 
-    kgp_connect(&url);
+    crate::kgp::kgp_connect(&url);
 
     // generate_new_token();
-}
+} */
 
 #[allow(dead_code)]
 fn generate_new_token() {

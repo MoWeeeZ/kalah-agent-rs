@@ -4,7 +4,7 @@ use std::time::Instant;
 use crate::kalah::valuation::{Valuation, ValuationFn};
 use crate::{Board, Move, Player};
 
-const LOG_STATS: bool = true;
+const LOG_STATS: bool = false;
 
 /*====================================================================================================================*/
 
@@ -14,12 +14,19 @@ pub struct MinimaxSearchState {
     pub search_active: bool,
 
     pub current_best_move: Move,
+
+    pub principal_variation: Vec<Move>,
 }
 
-pub fn new_shared_minimax_search_state(search_active: bool, fallback_move: Move) -> SharedMinimaxSearchState {
+pub fn new_shared_minimax_search_state(
+    search_active: bool,
+    fallback_move: Move,
+    principal_variation: Vec<Move>,
+) -> SharedMinimaxSearchState {
     Arc::new(Mutex::new(MinimaxSearchState {
         search_active,
         current_best_move: fallback_move,
+        principal_variation,
     }))
 }
 
@@ -49,7 +56,7 @@ impl MinimaxWorker {
         self.total_nodes_visited as f64 / self.start_t.elapsed().as_secs_f64()
     }
 
-    fn minimax(&mut self, board: &Board, remaining_depth: u32, alpha: Valuation, beta: Valuation) -> (Move, Valuation) {
+    fn minimax(&mut self, board: Board, remaining_depth: u32, alpha: Valuation, beta: Valuation) -> (Move, Valuation) {
         if !self.search_state.lock().unwrap().search_active {
             // search has been ended, search results don't matter anymore, exit thread asap
             return (Move::new(127, Player::White), Valuation::NonTerminal { value: 0 });
@@ -58,33 +65,24 @@ impl MinimaxWorker {
         self.total_nodes_visited += 1;
 
         if remaining_depth == 0 || !board.has_legal_move() {
-            return (Move::new(127, Player::White), (self.valuation_fn)(board));
+            return (Move::new(127, Player::White), (self.valuation_fn)(&board));
         }
 
         let mut best_move = Move::new(127, Player::White);
         let mut best_value = Valuation::TerminalBlackWin { plies: 0 };
         let mut alpha = alpha;
 
-        let mut board_after_move = board.clone();
-
-        for house in 0..board.h() {
-            let move_ = Move::new(house, Player::White);
-
-            if !board.is_legal_move(move_) {
-                continue;
-            }
-
-            // let mut board_after_move = board.clone();
-            board_after_move.clone_from(board);
+        for move_ in board.legal_moves(Player::White) {
+            let mut board_after_move = board.clone();
             let their_turn = !board_after_move.apply_move(move_);
 
             let value = if their_turn {
                 // opponent move: flip board, alpha, beta to their perspective and flip returned value to ours
                 board_after_move.flip_board();
-                -self.minimax(&board_after_move, remaining_depth - 1, -beta, -alpha).1
+                -self.minimax(board_after_move, remaining_depth - 1, -beta, -alpha).1
             } else {
                 // bonus move: don't decrease depth
-                self.minimax(&board_after_move, remaining_depth, alpha, beta).1
+                self.minimax(board_after_move, remaining_depth, alpha, beta).1
             }
             .increase_plies();
 
@@ -123,7 +121,7 @@ impl MinimaxWorker {
         // {
         for max_depth in 6.. {
             let board = board.clone();
-            let (best_move, best_value) = me.minimax(&board, max_depth, alpha, beta);
+            let (best_move, best_value) = me.minimax(board, max_depth, alpha, beta);
 
             if !me.search_state.lock().unwrap().search_active {
                 if LOG_STATS {
