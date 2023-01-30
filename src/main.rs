@@ -8,6 +8,7 @@ mod kgp;
 mod minimax;
 mod minimax_reference;
 mod pvs;
+mod tournament;
 mod util;
 
 use agent::{Agent, AgentState};
@@ -16,6 +17,12 @@ use rand::{thread_rng, Rng};
 use threadpool::ThreadPool;
 
 use crate::util::advance_random;
+
+/*====================================================================================================================*/
+
+pub const LOG_STATS: bool = true;
+
+/*====================================================================================================================*/
 
 fn single_ply<const DO_LOGGING: bool>(
     board: &mut Board,
@@ -290,12 +297,13 @@ pub fn compare_agents(board: Board, mut agent1: impl Agent, mut agent2: impl Age
     }
 }
 
-fn main() {
+/* fn main() {
     let h = 8;
     let s = 8;
 
     // let white_agent = agent::RandomAgent::new(h, s);
-    let white_agent = minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
+    // let white_agent = minimax::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
+    let white_agent = pvs::PVSAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
     // let white_agent = agent::FirstMoveAgent::new(h, s);
 
     // let black_agent = agent::RandomAgent::new(h, s);
@@ -307,7 +315,7 @@ fn main() {
     // let mut board = Board::new(h, s);
     // advance_random(h, s, &mut board, 2 * h as usize);
     // compare_agents(board, white_agent, black_agent);
-}
+} */
 
 /* fn main() {
     let h = 8;
@@ -318,18 +326,21 @@ fn main() {
     // let agent2_builder = &|| agent::RandomAgent::new(h, s);
     // let agent2_builder =
     //     &|| minimax_reference::MinimaxAgent::new(Board::new(h, s), 6, kalah::valuation::store_diff_valuation);
-    let agent2_builder = &|| minimax2::MinimaxAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
+    let agent2_builder = &|| pvs::PVSAgent::new(Board::new(h, s), kalah::valuation::store_diff_valuation);
 
     test_agents(h, s, agent1_builder, agent2_builder, 4 * 8);
 } */
 
-/* fn main() {
+fn main() {
     let url: url::Url = "wss://kalah.kwarc.info/socket".parse().unwrap();
-    // url.set_port(Some(2671)).unwrap();
 
     crate::kgp::kgp_connect(&url);
+}
 
-    // generate_new_token();
+/* fn main() {
+    let url: url::Url = "wss://localhost:2671".parse().unwrap();
+
+    crate::kgp::kgp_connect(&url);
 } */
 
 #[allow(dead_code)]

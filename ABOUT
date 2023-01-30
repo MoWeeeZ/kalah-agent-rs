@@ -10,13 +10,14 @@ We persused the following idea:
 
   - minimax search
   - alpha-beta pruning
+  - various others that didn't make it in the final bot
 
 Implementation
 --------------
 
 Our agent was written as follows:
 
-  - 50% after 12am, 100% on medically unadvisory levels of caffeine
+  - (at least) 50% after 12am, 100% on medically unadvisory levels of caffeine
   - some implementation details from the example python agent were used as a reference, in particular concerning KGP
     parsing and game state handling
 
@@ -25,7 +26,7 @@ CAVEATS
 
 Note the that there might be complications if:
 
-  - I fucked up (which I probably did) and am unlucky enough to hit that one edge case I didn't consider :)
+  - hahaha, when will there ever be not?
 
 Team
 ====
@@ -42,11 +43,11 @@ Consider taking the time to appropriately check these points:
 - [X] Our agent runs without raising exceptions.
       (exceptions? what are those? my agent just crashes when something goes wrong...)
 - [X] Our agent manages to reliably beat a random agent.
-- [ ] Our agent connects to localhost:2671 by default.
+- [X] Our agent connects to localhost:2671 by default.
 - [X] Your program does not depend on non-free software.
-- [ ] Any additional dependencies have been specified in the
+- [X] Any additional dependencies have been specified in the
       Dockerfile and we confirm that it builds.
 - [X] Max Musterman, Lieschen Müller and Hein Janmaat are not part
       of our team.
-- [X] We will not check this box. (don't tell me what to do)
+- [X] We will not check this box. (don't tell me what to do. haha, yes, I'm funny)
 - [X] We have read all of the above.

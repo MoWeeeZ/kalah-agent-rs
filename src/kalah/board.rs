@@ -268,7 +268,11 @@ impl Board {
     }
 
     pub fn apply_move(&mut self, move_: Move) -> bool {
-        assert!(move_.house() < self.h(), "Trying to apply a move that is out of range");
+        assert!(
+            move_.house() < self.h(),
+            "Trying to apply move {} that is out of range",
+            move_
+        );
 
         if move_.player() == Player::Black {
             // if the move is by 'Black': flip the board, apply the move as if by White, flip the board again

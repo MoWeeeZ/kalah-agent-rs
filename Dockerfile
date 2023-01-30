@@ -1,9 +1,6 @@
 FROM rust:latest as builder
 
 WORKDIR /usr/src/kalah
-# RUN cargo init
-# COPY Cargo.toml ./Cargo.toml
-# RUN cargo fetch
 COPY . .
 RUN cargo install --path .
 
@@ -19,3 +16,5 @@ COPY ./TOKEN /var/TOKEN
 ENV TOKEN_PATH=/var/TOKEN
 
 CMD ["kalah"]
+
+EXPOSE 2671

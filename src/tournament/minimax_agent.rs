@@ -1,34 +1,30 @@
 use std::sync::Arc;
 
-use crate::kalah::ValuationFn;
 use crate::{Board, Move, Player};
 
 use super::search::{minimax_search, new_shared_minimax_search_state, SharedMinimaxSearchState};
 use crate::agent::{Agent, AgentState};
 
-pub struct PVSAgent {
+pub struct MinimaxAgent {
     state: AgentState,
 
     board: Board,
 
     search_state: Option<SharedMinimaxSearchState>,
-
-    valuation_fn: ValuationFn,
 }
 
-impl PVSAgent {
+impl MinimaxAgent {
     #[allow(dead_code)]
-    pub fn new(board: Board, valuation_fn: ValuationFn) -> Self {
-        PVSAgent {
+    pub fn new(board: Board) -> Self {
+        MinimaxAgent {
             state: AgentState::Waiting,
             board,
             search_state: None,
-            valuation_fn,
         }
     }
 }
 
-impl Agent for PVSAgent {
+impl Agent for MinimaxAgent {
     fn update_board(&mut self, board: &Board) {
         self.board = board.clone();
     }
@@ -40,14 +36,7 @@ impl Agent for PVSAgent {
             self.state = AgentState::Waiting;
         }
 
-        self.search_state
-            .as_ref()
-            .unwrap()
-            .lock()
-            .unwrap()
-            .principal_variation
-            .best_move()
-            .unwrap_or_else(|| self.board.legal_moves(Player::White)[0])
+        self.search_state.as_ref().unwrap().lock().unwrap().current_best_move
     }
 
     fn get_state(&self) -> crate::agent::AgentState {
@@ -57,16 +46,10 @@ impl Agent for PVSAgent {
     fn go(&mut self) {
         // use first legal move as a fallback in case we don't complete a single search iteration, which really should
         // not happen
+        let fallback_move = *self.board.legal_moves(Player::White).first().unwrap();
+        let search_state = new_shared_minimax_search_state(true, fallback_move);
 
-        let pv = if let Some(ref search_state) = self.search_state {
-            search_state.lock().unwrap().principal_variation
-        } else {
-            super::Line::new()
-        };
-
-        let search_state = new_shared_minimax_search_state(true, pv);
-
-        minimax_search(&self.board, self.valuation_fn, Arc::clone(&search_state));
+        minimax_search(&self.board, Arc::clone(&search_state));
 
         self.state = AgentState::Go;
         self.search_state = Some(search_state);

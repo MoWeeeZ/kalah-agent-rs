@@ -52,7 +52,7 @@ impl Connection {
         match self.read().map(|msg| msg.parse().unwrap()) {
             Ok(cmd) => Some(cmd),
             Err(tungstenite::Error::Io(_)) => None,
-            Err(err) => panic!("Could not read command: {}", err),
+            Err(err) => panic!("Error reading command: {}", err),
         }
     }
 

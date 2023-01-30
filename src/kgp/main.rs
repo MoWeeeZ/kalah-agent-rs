@@ -3,22 +3,22 @@ use std::time::Duration;
 use url::Url;
 
 use crate::agent::{Agent, AgentState};
-use crate::kalah::valuation;
+// use crate::kalah::valuation;
 use crate::kgp::Connection;
-use crate::minimax::MinimaxAgent;
+use crate::tournament::MinimaxAgent;
 use crate::Board;
 
 use super::Command;
 
 /*====================================================================================================================*/
 
-#[derive(PartialEq, Eq)]
+/* #[derive(PartialEq, Eq)]
 enum CtrlCStatus {
     Run,
     ExitAfterGame,
 }
 
-static mut CTRLC_STATUS: CtrlCStatus = CtrlCStatus::Run;
+static mut CTRLC_STATUS: CtrlCStatus = CtrlCStatus::Run; */
 
 /*====================================================================================================================*/
 
@@ -47,9 +47,9 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
                 std::process::exit(1);
             }
 
-            let name = "TestAgent002";
-            // let authors = "";
-            // let description = "";
+            let name = "Sauerkraut";
+            // let authors = "Moritz Gmeiner";
+            // let description = "Minimax with alpha-beta pruning";
 
             let token_path = std::env::var("TOKEN_PATH").unwrap_or_else(|_| "./TOKEN".to_owned());
 
@@ -57,7 +57,7 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
                 Ok(raw_content) => String::from_utf8(raw_content).unwrap(),
                 Err(err) => {
                     if err.kind() == std::io::ErrorKind::NotFound {
-                        eprintln!("Not TOKEN file found");
+                        eprintln!("No TOKEN file found");
                         "".to_owned()
                     } else {
                         panic!("{}", err)
@@ -65,13 +65,13 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
                 }
             };
 
-            // TODO: send server name, authors and token
+            // send server name, authors and token
             conn.write_command(&format!("set info:name {}", name), None);
             println!("Setting name: {}", name);
             // conn.write_command(&format!("set info:authors {}", authors), None);
             // conn.write_command(&format!("set info:description {}", description), None);
-            conn.write_command(&format!("set info:token {}", token), None);
-            println!("Setting token: {}", token);
+            conn.write_command(&format!("set auth:token {}", token), None);
+            // println!("Setting token: {}", token);
 
             conn.write_command("mode freeplay", None);
 
@@ -80,27 +80,13 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
         Command::State { id, ref_id, board } => {
             let id = id.expect("Server didn't attach id to state");
 
-            if unsafe { CTRLC_STATUS == CtrlCStatus::ExitAfterGame } && board.our_store < 5 && board.their_store < 5 {
+            /* if unsafe { CTRLC_STATUS == CtrlCStatus::ExitAfterGame } && board.our_store < 5 && board.their_store < 5 {
                 // server trying to start second game
                 println!("Game finished, exiting");
                 std::process::exit(0);
-            }
-
-            /* if active_agents.contains_key(&id) {
-                // Duplicate IDs by the server are ignored
-                return;
             } */
 
             println!("\n\n{}\n", board);
-
-            /* let mut agent = if let Some(ref_id) = ref_id {
-                active_agents
-                    .remove(&ref_id)
-                    .expect("Server referenced ID that didn't exist")
-                    .0
-            } else {
-                new_agent(board)
-            }; */
 
             if let Some(ref_id) = ref_id {
                 assert_eq!(
@@ -115,9 +101,6 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
 
             agent.go();
             println!("go");
-
-            // insert agent with no current best move
-            // active_agents.insert(id, (agent, None));
         }
         Command::Stop { id: _id, ref_id } => {
             let ref_id = ref_id.unwrap();
@@ -142,7 +125,7 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
             println!("server set {} to {}", option, value);
         }
         Command::Error { id: _, ref_id: _, msg } => {
-            eprintln!("error {}", msg);
+            eprintln!("ERROR {}", msg);
             std::process::exit(1);
         }
         Command::Ping { id, ref_id: _, msg } => {
@@ -163,7 +146,7 @@ pub fn kgp_connect(url: &Url) {
 
     println!("Connected to game server {}", url);
 
-    ctrlc::set_handler(|| unsafe {
+    /* ctrlc::set_handler(|| unsafe {
         match CTRLC_STATUS {
             CtrlCStatus::Run => {
                 println!("Received Ctrl-C, exiting after game");
@@ -175,11 +158,11 @@ pub fn kgp_connect(url: &Url) {
             }
         }
     })
-    .expect("Could not set CtrlC handler");
+    .expect("Could not set CtrlC handler"); */
 
     // map of agents and their last best move
     // let mut active_agents: HashMap<u32, (Box<dyn Agent>, Option<Move>)> = HashMap::new();
-    let mut agent: Box<dyn Agent> = Box::new(MinimaxAgent::new(Board::new(6, 4), valuation::store_diff_valuation));
+    let mut agent: Box<dyn Agent> = Box::new(MinimaxAgent::new(Board::new(8, 8)));
     let mut last_best_move = None;
     let mut id = 0;
 
