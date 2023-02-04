@@ -127,7 +127,7 @@ impl MinimaxWorker {
                 if LOG_STATS {
                     println!("--------------------------------------------");
                     println!("* Minimax worker exited after max_depth {}", max_depth - 1);
-                    println!("* Best move had value {:?}", current_best_value);
+                    println!("* Best move had value {current_best_value:?}");
                     println!("* NPS: {:.2e} ({:?})", me.current_nps(), me.start_t.elapsed());
                     println!("--------------------------------------------\n");
                 }
@@ -137,7 +137,7 @@ impl MinimaxWorker {
             if let Valuation::TerminalWhiteWin { plies } = best_value {
                 if LOG_STATS {
                     println!("--------------------------------------------");
-                    println!("* Found certain win in {} plies", plies);
+                    println!("* Found certain win in {plies} plies");
                     println!("--------------------------------------------\n");
                 }
                 {
@@ -152,7 +152,7 @@ impl MinimaxWorker {
                 // all moves are certain losses, pick the one with the most plies and exit
                 if LOG_STATS {
                     println!("--------------------------------------------");
-                    println!("* Found certain loss in {} plies", plies);
+                    println!("* Found certain loss in {plies} plies");
                     println!("--------------------------------------------");
                     println!();
                 }
@@ -172,7 +172,7 @@ impl MinimaxWorker {
 
         if LOG_STATS {
             println!("--------------------------------------------");
-            println!("* Minimax worker exited after search depth {}", max_depth);
+            println!("* Minimax worker exited after search depth {max_depth}");
             println!(
                 "* Best move {} had value {:?}",
                 me.search_state.lock().unwrap().current_best_move,

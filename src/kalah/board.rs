@@ -194,10 +194,10 @@ impl Board {
                 write!(s, "<{}, {}, {}", self.h(), self.our_store, self.their_store).unwrap();
 
                 for seed in self.our_houses() {
-                    write!(s, ", {}", seed).unwrap();
+                    write!(s, ", {seed}").unwrap();
                 }
                 for seed in self.their_houses() {
-                    write!(s, ", {}", seed).unwrap();
+                    write!(s, ", {seed}").unwrap();
                 }
 
                 write!(s, ">").unwrap();
@@ -206,10 +206,10 @@ impl Board {
                 write!(s, "<{}, {}, {}", self.h(), self.their_store, self.our_store).unwrap();
 
                 for seed in self.their_houses() {
-                    write!(s, ", {}", seed).unwrap();
+                    write!(s, ", {seed}").unwrap();
                 }
                 for seed in self.our_houses() {
-                    write!(s, ", {}", seed).unwrap();
+                    write!(s, ", {seed}").unwrap();
                 }
 
                 write!(s, ">").unwrap();
@@ -270,8 +270,7 @@ impl Board {
     pub fn apply_move(&mut self, move_: Move) -> bool {
         assert!(
             move_.house() < self.h(),
-            "Trying to apply move {} that is out of range",
-            move_
+            "Trying to apply move {move_} that is out of range"
         );
 
         if move_.player() == Player::Black {
@@ -417,7 +416,7 @@ impl Display for Board {
         write!(f, "\n\n      ")?;
 
         for our_house in self.our_houses() {
-            write!(f, "{:>3} ", our_house)?;
+            write!(f, "{our_house:>3} ")?;
         }
 
         write!(f, "| {:>3}", self.our_store)

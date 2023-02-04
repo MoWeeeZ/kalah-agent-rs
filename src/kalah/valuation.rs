@@ -33,10 +33,10 @@ impl Valuation {
 impl Display for Valuation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Valuation::NonTerminal { value } => write!(f, "{}", value),
-            Valuation::TerminalWhiteWin { plies } => write!(f, "WhiteWin({})", plies),
-            Valuation::TerminalBlackWin { plies } => write!(f, "BlackWin({})", plies),
-            Valuation::TerminalDraw { plies } => write!(f, "Draw({})", plies),
+            Valuation::NonTerminal { value } => write!(f, "{value}"),
+            Valuation::TerminalWhiteWin { plies } => write!(f, "WhiteWin({plies})"),
+            Valuation::TerminalBlackWin { plies } => write!(f, "BlackWin({plies})"),
+            Valuation::TerminalDraw { plies } => write!(f, "Draw({plies})"),
         }
     }
 }

@@ -34,7 +34,7 @@ impl Connection {
             let msg = msg.into_text().unwrap();
             #[cfg(debug_assertions)]
             {
-                println!("< {}", msg);
+                println!("< {msg}");
             }
             msg
         })
@@ -43,7 +43,7 @@ impl Connection {
     fn write(&mut self, msg: String) {
         #[cfg(debug_assertions)]
         {
-            println!("> {}", msg);
+            println!("> {msg}");
         }
         self.websocket.write_message(msg.into()).unwrap()
     }
@@ -52,7 +52,7 @@ impl Connection {
         match self.read().map(|msg| msg.parse().unwrap()) {
             Ok(cmd) => Some(cmd),
             Err(tungstenite::Error::Io(_)) => None,
-            Err(err) => panic!("Error reading command: {}", err),
+            Err(err) => panic!("Error reading command: {err}"),
         }
     }
 

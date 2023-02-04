@@ -86,7 +86,7 @@ impl FromStr for Command {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let command_captures = COMMAND_REGEX
             .captures(s)
-            .ok_or(format!("command \"{}\" didn't match regex", s))?;
+            .ok_or(format!("command \"{s}\" didn't match regex"))?;
 
         let id = command_captures
             .name("id")
@@ -113,7 +113,7 @@ impl FromStr for Command {
                 let args_vec: Vec<&str> = args.split_ascii_whitespace().collect();
 
                 if args_vec.len() != 3 {
-                    return Err(format!("Unexpected args for kpg command: \"{}\"", args));
+                    return Err(format!("Unexpected args for kpg command: \"{args}\""));
                 }
 
                 let major: u8 = args_vec[0]
@@ -138,7 +138,7 @@ impl FromStr for Command {
                 let args_vec: Vec<&str> = args.split_ascii_whitespace().collect();
 
                 if args_vec.len() != 1 {
-                    return Err(format!("Unexpected args for state command: \"{}\"", args));
+                    return Err(format!("Unexpected args for state command: \"{args}\""));
                 }
 
                 let board = Board::from_kpg(args_vec[0]);
@@ -151,7 +151,7 @@ impl FromStr for Command {
                 let args_vec: Vec<&str> = args.split_ascii_whitespace().collect();
 
                 if args_vec.len() != 2 {
-                    return Err(format!("Unexpected args for set command: \"{}\"", args));
+                    return Err(format!("Unexpected args for set command: \"{args}\""));
                 }
 
                 Ok(Command::Set {
@@ -177,7 +177,7 @@ impl FromStr for Command {
                 ref_id,
                 msg: args.to_owned(),
             }),
-            _ => Err(format!("Unknown command {}", cmd)),
+            _ => Err(format!("Unknown command {cmd}")),
         }
     }
 }
@@ -193,37 +193,37 @@ impl Display for Command {
                 patch,
             } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
-                write!(f, " kpg {} {} {}", major, minor, patch)
+                write!(f, " kpg {major} {minor} {patch}")
             }
             Command::State { id, ref_id, board } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
                 write!(f, " state {}", board.to_kgp())
             }
             Command::Stop { id, ref_id } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
                 write!(f, " stop")
             }
             Command::Ok { id, ref_id } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
                 write!(f, " ok")
             }
@@ -234,48 +234,48 @@ impl Display for Command {
                 value,
             } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
-                write!(f, " set {} {}", option, value)
+                write!(f, " set {option} {value}")
             }
             Command::Ping { id, ref_id, msg } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
-                write!(f, " ping {}", msg)
+                write!(f, " ping {msg}")
             }
             Command::Pong { id, ref_id, msg } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
-                write!(f, " pong {}", msg)
+                write!(f, " pong {msg}")
             }
             Command::Goodbye { id, ref_id } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
                 write!(f, " goodbye")
             }
             Command::Error { id, ref_id, msg } => {
                 if let Some(id) = id {
-                    write!(f, "{}", id)?;
+                    write!(f, "{id}")?;
                 }
                 if let Some(ref_id) = ref_id {
-                    write!(f, "@{}", ref_id)?;
+                    write!(f, "@{ref_id}")?;
                 }
-                write!(f, " error {}", msg)
+                write!(f, " error {msg}")
             }
         }
     }

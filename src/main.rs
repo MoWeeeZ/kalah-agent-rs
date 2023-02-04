@@ -31,7 +31,7 @@ fn single_ply<const DO_LOGGING: bool>(
     thinking_time: Duration,
 ) -> Player {
     if DO_LOGGING {
-        println!("{}\n", board);
+        println!("{board}\n");
     }
 
     match player {
@@ -67,16 +67,13 @@ fn single_ply<const DO_LOGGING: bool>(
     let valid_moves = board.legal_moves(player);
 
     if !valid_moves.iter().any(|valid_move| *valid_move == player_move) {
-        panic!(
-            "Invalid move {:?} by Player {} in position \n{}\n\n",
-            player_move, player, board
-        );
+        panic!("Invalid move {player_move:?} by Player {player} in position \n{board}\n\n");
         /* player_move = *valid_moves.choose(&mut thread_rng()).unwrap();
         println!("Invalid move, using {} instead", player_move); */
     }
 
     if DO_LOGGING {
-        println!("{}: playing move {}", player, player_move);
+        println!("{player}: playing move {player_move}");
     }
 
     let moves_again = board.apply_move(player_move);
@@ -131,7 +128,7 @@ where
 
     let board = game_loop::<true>(board, white_agent, black_agent, thinking_time);
 
-    println!("\nFinal board:\n\n{}\n", board);
+    println!("\nFinal board:\n\n{board}\n");
 
     match board.our_store.cmp(&board.their_store) {
         std::cmp::Ordering::Less => println!("Black won."),
@@ -158,7 +155,7 @@ pub fn test_agents<Agent1, Agent2>(
 
     let thinking_time = Duration::from_secs(2);
 
-    println!("Running with {} workers", num_workers);
+    println!("Running with {num_workers} workers");
 
     let agent1_white_wins = Arc::new(AtomicU64::new(0));
     let agent1_black_wins = Arc::new(AtomicU64::new(0));
@@ -229,10 +226,10 @@ pub fn test_agents<Agent1, Agent2>(
     let mut num_done = 0;
 
     match num_runs {
-        num_runs if num_runs < 10 => println!("{:01}/{:01}", num_done, num_runs),
-        num_runs if num_runs < 100 => println!("{:02}/{:02}", num_done, num_runs),
-        num_runs if num_runs < 1000 => println!("{:03}/{:03}", num_done, num_runs),
-        _ => panic!("formatting for {} num_runs not supported", num_runs),
+        num_runs if num_runs < 10 => println!("{num_done:01}/{num_runs:01}"),
+        num_runs if num_runs < 100 => println!("{num_done:02}/{num_runs:02}"),
+        num_runs if num_runs < 1000 => println!("{num_done:03}/{num_runs:03}"),
+        _ => panic!("formatting for {num_runs} num_runs not supported"),
     };
 
     loop {
@@ -245,10 +242,10 @@ pub fn test_agents<Agent1, Agent2>(
             num_done = new_num_done;
 
             match num_runs {
-                num_runs if num_runs < 10 => println!("{:01}/{:01}", num_done, num_runs),
-                num_runs if num_runs < 100 => println!("{:02}/{:02}", num_done, num_runs),
-                num_runs if num_runs < 1000 => println!("{:03}/{:03}", num_done, num_runs),
-                _ => panic!("formatting for {} num_runs not supported", num_runs),
+                num_runs if num_runs < 10 => println!("{num_done:01}/{num_runs:01}"),
+                num_runs if num_runs < 100 => println!("{num_done:02}/{num_runs:02}"),
+                num_runs if num_runs < 1000 => println!("{num_done:03}/{num_runs:03}"),
+                _ => panic!("formatting for {num_runs} num_runs not supported"),
             };
         }
 
@@ -276,7 +273,7 @@ pub fn test_agents<Agent1, Agent2>(
 }
 
 pub fn compare_agents(board: Board, mut agent1: impl Agent, mut agent2: impl Agent) {
-    println!("{}\n\n", board);
+    println!("{board}\n\n");
 
     agent1.update_board(&board);
     agent1.go();
@@ -351,5 +348,5 @@ fn generate_new_token() {
 
     let token = base64::encode(bytes);
 
-    println!("{}", token);
+    println!("{token}");
 }

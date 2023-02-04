@@ -160,7 +160,7 @@ impl MinimaxWorker {
         if LOG_STATS {
             println!("--------------------------------------------");
             println!("* Minimax reference worker exited after max_depth {}", me.max_depth);
-            println!("* Best move {} had value {:?}", best_move, best_value);
+            println!("* Best move {best_move} had value {best_value:?}");
             println!("* NPS: {:.2e} ({:?})", me.current_nps(), me.start_t.elapsed());
             println!("--------------------------------------------\n");
         }

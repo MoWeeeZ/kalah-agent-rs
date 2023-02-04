@@ -217,10 +217,7 @@ impl PVSWorker {
         // {
         for max_depth in 1.. {
             if max_depth > LINE_MAX_SIZE as u32 {
-                panic!(
-                    "Tried searching to depth {}, but MOVE_LINE_MAX is {}",
-                    max_depth, LINE_MAX_SIZE
-                );
+                panic!("Tried searching to depth {max_depth}, but MOVE_LINE_MAX is {LINE_MAX_SIZE}");
             }
 
             me.extend_pv(&board, &mut pv);
@@ -231,7 +228,7 @@ impl PVSWorker {
                 if LOG_STATS {
                     println!("--------------------------------------------");
                     println!("* Minimax worker exited after max_depth {}", max_depth - 1);
-                    println!("* Best move had value {:?}", current_best_value);
+                    println!("* Best move had value {current_best_value:?}");
                     println!("* NPS: {:.2e} ({:?})", me.current_nps(), me.start_t.elapsed());
                     println!("--------------------------------------------\n");
                 }
@@ -241,7 +238,7 @@ impl PVSWorker {
             if let Valuation::TerminalWhiteWin { plies } = best_value {
                 if LOG_STATS {
                     println!("--------------------------------------------");
-                    println!("* Found certain win in {} plies", plies);
+                    println!("* Found certain win in {plies} plies");
                     println!("--------------------------------------------\n");
                 }
                 {
@@ -256,7 +253,7 @@ impl PVSWorker {
                 // all moves are certain losses, pick the one with the most plies and exit
                 if LOG_STATS {
                     println!("--------------------------------------------");
-                    println!("* Found certain loss in {} plies", plies);
+                    println!("* Found certain loss in {plies} plies");
                     println!("--------------------------------------------");
                     println!();
                 }
@@ -276,7 +273,7 @@ impl PVSWorker {
 
         if LOG_STATS {
             println!("--------------------------------------------");
-            println!("* Minimax worker exited after search depth {}", max_depth);
+            println!("* Minimax worker exited after search depth {max_depth}");
             println!(
                 "* Best move {} had value {:?}",
                 me.search_state.lock().unwrap().principal_variation.best_move().unwrap(),

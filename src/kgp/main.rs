@@ -43,7 +43,7 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
         } => {
             if major != 1 {
                 conn.write_command("error protocol not supported", id);
-                eprintln!("Server tried to use unsupported protocol {}.{}.{}", major, minor, patch);
+                eprintln!("Server tried to use unsupported protocol {major}.{minor}.{patch}");
                 std::process::exit(1);
             }
 
@@ -66,11 +66,11 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
             };
 
             // send server name, authors and token
-            conn.write_command(&format!("set info:name {}", name), None);
-            println!("Setting name: {}", name);
+            conn.write_command(&format!("set info:name {name}"), None);
+            println!("Setting name: {name}");
             // conn.write_command(&format!("set info:authors {}", authors), None);
             // conn.write_command(&format!("set info:description {}", description), None);
-            conn.write_command(&format!("set auth:token {}", token), None);
+            conn.write_command(&format!("set auth:token {token}"), None);
             // println!("Setting token: {}", token);
 
             conn.write_command("mode freeplay", None);
@@ -86,13 +86,12 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
                 std::process::exit(0);
             } */
 
-            println!("\n\n{}\n", board);
+            println!("\n\n{board}\n");
 
             if let Some(ref_id) = ref_id {
                 assert_eq!(
                     ref_id, *cur_id,
-                    "Server referenced ID {}, but current ID is {}",
-                    ref_id, cur_id
+                    "Server referenced ID {ref_id}, but current ID is {cur_id}"
                 );
             }
 
@@ -106,11 +105,10 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
             let ref_id = ref_id.unwrap();
             assert_eq!(
                 ref_id, *cur_id,
-                "Server told ID {} to stop, but current ID is {}",
-                ref_id, cur_id
+                "Server told ID {ref_id} to stop, but current ID is {cur_id}"
             );
             // let (mut agent, best_move) = active_agents.remove(&ref_id).unwrap();
-            println!("{} stop", ref_id);
+            println!("{ref_id} stop");
             agent.stop();
         }
         Command::Ok { .. } => {
@@ -122,14 +120,14 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
             option,
             value,
         } => {
-            println!("server set {} to {}", option, value);
+            println!("server set {option} to {value}");
         }
         Command::Error { id: _, ref_id: _, msg } => {
-            eprintln!("ERROR {}", msg);
+            eprintln!("ERROR {msg}");
             std::process::exit(1);
         }
         Command::Ping { id, ref_id: _, msg } => {
-            conn.write_command(&format!("pong {}", msg), id);
+            conn.write_command(&format!("pong {msg}"), id);
         }
         Command::Pong { .. } => { /* ignore */ }
         Command::Goodbye { .. } => {
@@ -140,11 +138,11 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
 
 #[allow(dead_code)]
 pub fn kgp_connect(url: &Url) {
-    println!("Connecting to game server at {}...", url);
+    println!("Connecting to game server at {url}...");
 
     let mut conn = Connection::new(url).expect("Failed to connect");
 
-    println!("Connected to game server {}", url);
+    println!("Connected to game server {url}");
 
     /* ctrlc::set_handler(|| unsafe {
         match CTRLC_STATUS {
