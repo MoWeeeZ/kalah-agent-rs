@@ -1,7 +1,5 @@
 use std::time::Duration;
 
-use url::Url;
-
 use crate::agent::{Agent, AgentState};
 // use crate::kalah::valuation;
 use crate::kgp::Connection;
@@ -137,13 +135,8 @@ fn process_command(conn: &mut Connection, agent: &mut Box<dyn Agent>, cur_id: &m
 }
 
 #[allow(dead_code)]
-pub fn kgp_connect(url: &Url) {
-    println!("Connecting to game server at {url}...");
-
-    let mut conn = Connection::new(url).expect("Failed to connect");
-
-    println!("Connected to game server {url}");
-
+pub fn kgp_connect(conn: Connection) {
+    let mut conn = conn;
     /* ctrlc::set_handler(|| unsafe {
         match CTRLC_STATUS {
             CtrlCStatus::Run => {

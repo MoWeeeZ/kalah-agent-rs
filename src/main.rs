@@ -1,7 +1,3 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
-
 mod agent;
 mod kalah;
 mod kgp;
@@ -11,12 +7,9 @@ mod pvs;
 mod tournament;
 mod util;
 
-use agent::{Agent, AgentState};
 pub use kalah::{Board, House, Move, Player};
-use rand::{thread_rng, Rng};
-use threadpool::ThreadPool;
 
-use crate::util::advance_random;
+use crate::kgp::Connection;
 
 /*====================================================================================================================*/
 
@@ -24,7 +17,7 @@ pub const LOG_STATS: bool = true;
 
 /*====================================================================================================================*/
 
-fn single_ply<const DO_LOGGING: bool>(
+/* fn single_ply<const DO_LOGGING: bool>(
     board: &mut Board,
     playing_agent: &mut impl Agent,
     player: Player,
@@ -135,9 +128,9 @@ where
         std::cmp::Ordering::Equal => println!("Draw."),
         std::cmp::Ordering::Greater => println!("White won."),
     }
-}
+} */
 
-#[allow(dead_code)]
+/* #[allow(dead_code)]
 pub fn test_agents<Agent1, Agent2>(
     h: u8,
     s: u16,
@@ -270,9 +263,9 @@ pub fn test_agents<Agent1, Agent2>(
         agent2_white_wins.load(Ordering::Acquire),
         agent2_black_wins.load(Ordering::Acquire)
     );
-}
+} */
 
-pub fn compare_agents(board: Board, mut agent1: impl Agent, mut agent2: impl Agent) {
+/* pub fn compare_agents(board: Board, mut agent1: impl Agent, mut agent2: impl Agent) {
     println!("{board}\n\n");
 
     agent1.update_board(&board);
@@ -292,7 +285,7 @@ pub fn compare_agents(board: Board, mut agent1: impl Agent, mut agent2: impl Age
         let _ = agent2.get_current_best_move();
         std::thread::sleep(Duration::from_millis(50));
     }
-}
+} */
 
 /* fn main() {
     let h = 8;
@@ -328,20 +321,31 @@ pub fn compare_agents(board: Board, mut agent1: impl Agent, mut agent2: impl Age
     test_agents(h, s, agent1_builder, agent2_builder, 4 * 8);
 } */
 
-fn main() {
-    let url: url::Url = "wss://kalah.kwarc.info/socket".parse().unwrap();
-
-    crate::kgp::kgp_connect(&url);
-}
-
 /* fn main() {
-    let url: url::Url = "wss://localhost:2671".parse().unwrap();
+    let url = "wss://kalah.kwarc.info/socket";
 
-    crate::kgp::kgp_connect(&url);
+    println!("Connecting to game server at {url}...");
+
+    let conn = Connection::new_websocket(url).expect("Failed to connect");
+
+    println!("Connected to game server {url}");
+
+    crate::kgp::kgp_connect(conn);
 } */
 
-#[allow(dead_code)]
-fn generate_new_token() {
+fn main() {
+    let url = "localhost:2671";
+
+    println!("Connecting to game server at {url}...");
+
+    let conn = Connection::new_tcpstream(url).expect("Failed to connect");
+
+    println!("Connected to game server {url}");
+
+    crate::kgp::kgp_connect(conn);
+}
+
+/* fn generate_new_token() {
     let mut bytes: [u8; 64] = [0; 64];
 
     thread_rng().fill(&mut bytes);
@@ -349,4 +353,4 @@ fn generate_new_token() {
     let token = base64::encode(bytes);
 
     println!("{token}");
-}
+} */

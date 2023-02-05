@@ -1,11 +1,6 @@
-use std::time::Duration;
-
-use crate::agent::RandomAgent;
-use crate::{single_ply, Board, Player};
-
 pub mod math;
 
-pub fn advance_random(h: u8, s: u16, board: &mut Board, num_moves: usize) {
+/* pub fn advance_random(h: u8, s: u16, board: &mut Board, num_moves: usize) {
     let mut current_player = Player::White;
     let mut random_agent = RandomAgent::new(h, s);
 
@@ -25,4 +20,4 @@ pub fn advance_random(h: u8, s: u16, board: &mut Board, num_moves: usize) {
             break;
         }
     }
-}
+} */

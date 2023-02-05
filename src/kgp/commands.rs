@@ -164,7 +164,7 @@ impl FromStr for Command {
             "ping" => Ok(Command::Ping {
                 id,
                 ref_id,
-                msg: args.to_owned(),
+                msg: "".to_owned(),
             }),
             "pong" => Ok(Command::Pong {
                 id,
